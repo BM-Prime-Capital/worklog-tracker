@@ -231,7 +231,7 @@ export default function ProjectWorklogs({ developers, isLoading }: ProjectWorklo
             </div>
             <div>
               <p className="text-2xl font-bold text-green-600">
-                {filteredProjects.reduce((sum, p) => sum + p.developers.length, 0)}
+                {new Set(filteredProjects.flatMap(p => p.developers.map(d => d.developerName))).size}
               </p>
               <p className="text-sm text-gray-600">Active Developers</p>
             </div>

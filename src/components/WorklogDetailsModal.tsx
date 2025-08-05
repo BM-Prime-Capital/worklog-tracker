@@ -22,6 +22,10 @@ interface WorklogDetailsModalProps {
 }
 
 export default function WorklogDetailsModal({ worklog, isOpen, onClose }: WorklogDetailsModalProps) {
+  console.log("worklog", worklog)
+  console.log("worklog comment:", worklog?.comment)
+  console.log("worklog comment type:", typeof worklog?.comment)
+  console.log("worklog comment length:", worklog?.comment?.length)
   // Close modal on escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -119,10 +123,19 @@ export default function WorklogDetailsModal({ worklog, isOpen, onClose }: Worklo
                   <div className="flex items-start space-x-2">
                     <FileText className="w-4 h-4 text-gray-400 mt-0.5" />
                     <div>
-                      <span className="text-sm font-medium text-gray-900">Summary:</span>
+                      <span className="text-sm font-medium text-gray-900">Issue title:</span>
                       <p className="text-sm text-gray-700 mt-1">{worklog.summary}</p>
                     </div>
                   </div>
+                  {worklog.comment && worklog.comment.trim() !== '' && (
+                    <div className="flex items-start space-x-2">
+                      <MessageSquare className="w-4 h-4 text-gray-400 mt-0.5" />
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">Work summary:</span>
+                        <p className="text-sm text-gray-700 mt-1">{worklog.comment}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -175,12 +188,12 @@ export default function WorklogDetailsModal({ worklog, isOpen, onClose }: Worklo
                 </div>
               </div>
 
-              {/* Comments Section */}
-              {worklog.comment && (
+              {/* Summary Section */}
+              {worklog.comment && worklog.comment.trim() !== '' && (
                 <div className="bg-yellow-50 rounded-lg p-4">
                   <div className="flex items-center space-x-2 mb-3">
                     <MessageSquare className="w-5 h-5 text-yellow-600" />
-                    <h3 className="text-lg font-semibold text-gray-900">Comments</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Summary</h3>
                   </div>
                   <div className="bg-white rounded-lg p-4 border border-yellow-200">
                     <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
@@ -189,6 +202,7 @@ export default function WorklogDetailsModal({ worklog, isOpen, onClose }: Worklo
                   </div>
                 </div>
               )}
+
 
               {/* Additional Details */}
               <div className="bg-gray-50 rounded-lg p-4">

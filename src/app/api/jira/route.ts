@@ -190,19 +190,27 @@ function extractWorklogs(issues: unknown[], startDate: string, endDate: string) 
           const end = new Date(endDate)
           
           if (worklogDate >= start && worklogDate <= end) {
-            // Handle comment field - extract text if it's an object
+            // Enhanced comment extraction with debugging
             let commentText: string | undefined
+            
             if (worklog && typeof worklog === 'object' && 'comment' in worklog && worklog.comment) {
+              console.log('Raw worklog comment:', worklog.comment)
+              console.log('Comment type:', typeof worklog.comment)
+              
               if (typeof worklog.comment === 'string') {
                 commentText = worklog.comment
-              } else if (typeof worklog.comment === 'object' && worklog.comment !== null && 'content' in worklog.comment) {
-                // Extract text from Jira's structured content format
-                const content = (worklog.comment as { content: unknown[] }).content
-                if (Array.isArray(content)) {
-                  commentText = content
-                    .filter(item => typeof item === 'object' && item !== null && 'text' in item)
-                    .map(item => (item as { text: string }).text)
-                    .join(' ')
+                console.log('String comment extracted:', commentText)
+              } else if (typeof worklog.comment === 'object' && worklog.comment !== null) {
+                console.log('Object comment structure:', JSON.stringify(worklog.comment, null, 2))
+                
+                // Handle Jira's structured content format
+                if ('content' in worklog.comment && Array.isArray((worklog.comment as { content: unknown[] }).content)) {
+                  const content = (worklog.comment as { content: unknown[] }).content
+                  commentText = extractTextFromContent(content)
+                  console.log('Extracted text from content:', commentText)
+                } else if ('text' in worklog.comment && typeof (worklog.comment as { text: string }).text === 'string') {
+                  commentText = (worklog.comment as { text: string }).text
+                  console.log('Direct text extracted:', commentText)
                 }
               }
             }
@@ -219,5 +227,34 @@ function extractWorklogs(issues: unknown[], startDate: string, endDate: string) 
     }
   }
   
+  console.log('Total worklogs extracted:', worklogs.length)
+  console.log('Worklogs with comments:', worklogs.filter(w => w && typeof w === 'object' && 'comment' in w && w.comment).length)
+  
   return worklogs
+}
+
+function extractTextFromContent(content: unknown[]): string {
+  const texts: string[] = []
+  
+  function extractFromNode(node: unknown): void {
+    if (typeof node === 'object' && node !== null) {
+      if ('text' in node && typeof (node as { text: string }).text === 'string') {
+        texts.push((node as { text: string }).text)
+      }
+      
+      if ('content' in node && Array.isArray((node as { content: unknown[] }).content)) {
+        (node as { content: unknown[] }).content.forEach(extractFromNode)
+      }
+      
+      if ('attrs' in node && typeof (node as { attrs: unknown }).attrs === 'object' && (node as { attrs: unknown }).attrs !== null) {
+        const attrs = (node as { attrs: unknown }).attrs
+        if (typeof attrs === 'object' && attrs !== null && 'text' in attrs && typeof (attrs as { text: string }).text === 'string') {
+          texts.push((attrs as { text: string }).text)
+        }
+      }
+    }
+  }
+  
+  content.forEach(extractFromNode)
+  return texts.join(' ')
 } 

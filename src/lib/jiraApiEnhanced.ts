@@ -296,10 +296,143 @@ class JiraApiService {
       }
 
       const data = await response.json()
-      return data.issues
+      console.log('Jira API getIssues response:', data)
+      return data.issues || []
     } catch (error) {
       console.error('Error fetching issues:', error)
       throw error
+    }
+  }
+
+  async getRecentIssues(maxResults: number = 50): Promise<any[]> {
+    const credentials = this.getCredentials()
+    if (!credentials) {
+      throw new Error('Not authenticated')
+    }
+
+    try {
+      const response = await fetch('/api/jira', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get-recent-issues',
+          credentials,
+          params: { maxResults }
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch recent issues')
+      }
+
+      const data = await response.json()
+      console.log('Jira API getRecentIssues response:', data)
+      return data.issues || []
+    } catch (error) {
+      console.error('Error fetching recent issues:', error)
+      throw error
+    }
+  }
+
+  async getProjectIssueCount(projectKey: string): Promise<number> {
+    const credentials = this.getCredentials()
+    if (!credentials) {
+      throw new Error('Not authenticated')
+    }
+
+    try {
+      const response = await fetch('/api/jira', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get-project-issue-count',
+          credentials,
+          params: { projectKey }
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch project issue count')
+      }
+
+      const data = await response.json()
+      console.log(`Jira API getProjectIssueCount response for ${projectKey}:`, data)
+      return data.total || 0
+    } catch (error) {
+      console.error(`Error fetching issue count for project ${projectKey}:`, error)
+      return 0
+    }
+  }
+
+  async getProjectDoneIssuesCount(projectKey: string): Promise<number> {
+    const credentials = this.getCredentials()
+    if (!credentials) {
+      throw new Error('Not authenticated')
+    }
+
+    try {
+      const response = await fetch('/api/jira', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get-project-done-issues-count',
+          credentials,
+          params: { projectKey }
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch project done issues count')
+      }
+
+      const data = await response.json()
+      console.log(`Jira API getProjectDoneIssuesCount response for ${projectKey}:`, data)
+      return data.total || 0
+    } catch (error) {
+      console.error(`Error fetching done issues count for project ${projectKey}:`, error)
+      return 0
+    }
+  }
+
+  async getProjectStats(projectKey: string): Promise<{
+    totalIssues: number
+    doneIssues: number
+    progressPercentage: number
+  }> {
+    const credentials = this.getCredentials()
+    if (!credentials) {
+      throw new Error('Not authenticated')
+    }
+
+    try {
+      const response = await fetch('/api/jira', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get-project-stats',
+          credentials,
+          params: { projectKey }
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch project stats')
+      }
+
+      const data = await response.json()
+      console.log(`Jira API getProjectStats response for ${projectKey}:`, data)
+      return {
+        totalIssues: data.totalIssues || 0,
+        doneIssues: data.doneIssues || 0,
+        progressPercentage: data.progressPercentage || 0
+      }
+    } catch (error) {
+      console.error(`Error fetching project stats for ${projectKey}:`, error)
+      return {
+        totalIssues: 0,
+        doneIssues: 0,
+        progressPercentage: 0
+      }
     }
   }
 

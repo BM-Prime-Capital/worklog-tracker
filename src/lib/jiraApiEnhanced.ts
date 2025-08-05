@@ -49,6 +49,7 @@ export interface JiraUser {
   emailAddress: string
   active: boolean
   timeZone: string
+  accountType?: string
 }
 
 export interface DeveloperData {

@@ -181,15 +181,28 @@ function buildWorklogJQL(startDate: string, endDate: string, projectKeys?: strin
 function extractWorklogs(issues: unknown[], startDate: string, endDate: string) {
   const worklogs: unknown[] = []
   
+  console.log('Extracting worklogs for date range:', startDate, 'to', endDate)
+  
   for (const issue of issues) {
     if (issue && typeof issue === 'object' && 'fields' in issue && issue.fields && typeof issue.fields === 'object' && 'worklog' in issue.fields && issue.fields.worklog && typeof issue.fields.worklog === 'object' && 'worklogs' in issue.fields.worklog && Array.isArray(issue.fields.worklog.worklogs)) {
       for (const worklog of issue.fields.worklog.worklogs) {
         if (worklog && typeof worklog === 'object' && 'started' in worklog && typeof worklog.started === 'string') {
           const worklogDate = new Date(worklog.started)
-          const start = new Date(startDate)
-          const end = new Date(endDate)
+          // Create dates in local timezone for consistent comparison
+          const start = new Date(startDate + 'T00:00:00.000Z')
+          const end = new Date(endDate + 'T23:59:59.999Z')
           
-          if (worklogDate >= start && worklogDate <= end) {
+          // Extract just the date part for comparison (YYYY-MM-DD)
+          const worklogDateOnly = worklogDate.toISOString().split('T')[0]
+          const startDateOnly = start.toISOString().split('T')[0]
+          const endDateOnly = end.toISOString().split('T')[0]
+          
+          console.log('Worklog date:', worklog.started, '->', worklogDate.toISOString(), '->', worklogDateOnly)
+          console.log('Date range:', start.toISOString(), 'to', end.toISOString())
+          console.log('Date range (date only):', startDateOnly, 'to', endDateOnly)
+          console.log('Is in range (date only):', worklogDateOnly >= startDateOnly && worklogDateOnly <= endDateOnly)
+          
+          if (worklogDateOnly >= startDateOnly && worklogDateOnly <= endDateOnly) {
             // Enhanced comment extraction with debugging
             let commentText: string | undefined
             

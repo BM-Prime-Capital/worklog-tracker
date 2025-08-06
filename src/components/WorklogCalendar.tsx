@@ -23,32 +23,47 @@ export default function WorklogCalendar({ selectedDate, filterType, onDateChange
   
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd })
 
-  // Group worklogs by date
+  // Group worklogs by date with timezone handling
   const worklogsByDate = worklogs.reduce((acc, worklog) => {
-    const date = format(new Date(worklog.started), 'yyyy-MM-dd')
+    // Parse the date and convert to local timezone
+    const worklogDate = new Date(worklog.started)
+    // Use the local date string to avoid timezone issues
+    const date = worklogDate.toLocaleDateString('en-CA') // Returns YYYY-MM-DD format
+    console.log('Worklog date processing:', worklog.started, '->', worklogDate.toISOString(), '->', date)
+    
     if (!acc[date]) {
       acc[date] = []
     }
     acc[date].push(worklog)
     return acc
   }, {} as Record<string, JiraWorklog[]>)
+  
+  console.log('Available worklog dates:', Object.keys(worklogsByDate))
+  console.log('Worklogs by date:', worklogsByDate)
 
   // Calculate total hours for a specific date
   const getHoursForDate = (date: Date) => {
-    const dateKey = format(date, 'yyyy-MM-dd')
+    const dateKey = date.toLocaleDateString('en-CA') // Use same format as worklog grouping
+    console.log('Getting hours for date:', format(date, 'yyyy-MM-dd'), '->', dateKey)
     const dayWorklogs = worklogsByDate[dateKey] || []
-    return dayWorklogs.reduce((total, worklog) => total + (worklog.timeSpentSeconds / 3600), 0)
+    const hours = dayWorklogs.reduce((total, worklog) => total + (worklog.timeSpentSeconds / 3600), 0)
+    console.log('Found', dayWorklogs.length, 'worklogs for', dateKey, 'with', hours, 'hours')
+    return hours
   }
 
   // Check if date is in selected range
   const isInSelectedRange = (date: Date) => {
     switch (filterType) {
       case 'day':
-        return isSameDay(date, selectedDate)
+        const isDaySelected = isSameDay(date, selectedDate)
+        console.log('Day check:', format(date, 'yyyy-MM-dd'), 'vs', format(selectedDate, 'yyyy-MM-dd'), '=', isDaySelected)
+        return isDaySelected
       case 'week':
         const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 })
         const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 1 })
-        return isWithinInterval(date, { start: weekStart, end: weekEnd })
+        const isInWeek = isWithinInterval(date, { start: weekStart, end: weekEnd })
+        console.log('Week check:', format(date, 'yyyy-MM-dd'), 'in week', format(weekStart, 'yyyy-MM-dd'), 'to', format(weekEnd, 'yyyy-MM-dd'), '=', isInWeek)
+        return isInWeek
       case 'month':
         return isSameMonth(date, selectedDate)
       default:
@@ -58,8 +73,10 @@ export default function WorklogCalendar({ selectedDate, filterType, onDateChange
 
   // Check if date has worklogs
   const hasWorklogs = (date: Date) => {
-    const dateKey = format(date, 'yyyy-MM-dd')
-    return worklogsByDate[dateKey] && worklogsByDate[dateKey].length > 0
+    const dateKey = date.toLocaleDateString('en-CA') // Use same format as worklog grouping
+    const hasData = worklogsByDate[dateKey] && worklogsByDate[dateKey].length > 0
+    console.log('Checking worklogs for date:', format(date, 'yyyy-MM-dd'), '->', dateKey, '=', hasData)
+    return hasData
   }
 
   const handleDateClick = (date: Date) => {

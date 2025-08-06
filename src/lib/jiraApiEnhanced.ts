@@ -246,7 +246,7 @@ class JiraApiService {
     }
   }
 
-  async getProjects(): Promise<any[]> {
+  async getProjects(): Promise<unknown[]> {
     const credentials = this.getCredentials()
     if (!credentials) {
       throw new Error('Not authenticated')
@@ -274,7 +274,7 @@ class JiraApiService {
     }
   }
 
-  async getIssues(projectKeys?: string[], maxResults: number = 50): Promise<any[]> {
+  async getIssues(projectKeys?: string[], maxResults: number = 50): Promise<unknown[]> {
     const credentials = this.getCredentials()
     if (!credentials) {
       throw new Error('Not authenticated')
@@ -304,7 +304,7 @@ class JiraApiService {
     }
   }
 
-  async getRecentIssues(maxResults: number = 50): Promise<any[]> {
+  async getRecentIssues(maxResults: number = 50): Promise<unknown[]> {
     const credentials = this.getCredentials()
     if (!credentials) {
       throw new Error('Not authenticated')
@@ -542,6 +542,7 @@ class JiraApiService {
       return {
         id: dev.id,
         name: dev.name,
+        email: dev.email,
         avatar: dev.avatar,
         team: dev.team,
         hours: Math.round(dev.hours * 100) / 100, // Round to 2 decimal places

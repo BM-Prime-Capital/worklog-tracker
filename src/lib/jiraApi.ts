@@ -50,6 +50,60 @@ export interface JiraUser {
   timeZone: string
 }
 
+export interface DeveloperData {
+  name: string
+  avatar: string
+  team: string
+  hours: number
+  tasks: Set<string>
+  completed: number
+  productivity: number
+  trend: 'up' | 'down' | 'stable'
+  lastActive: string
+  status: 'online' | 'offline'
+}
+
+export interface JiraIssue {
+  id: string
+  key: string
+  summary: string
+  status: {
+    name: string
+    statusCategory: {
+      name: string
+    }
+  }
+  assignee?: {
+    displayName: string
+    emailAddress: string
+  }
+  worklog: {
+    worklogs: JiraWorklog[]
+    total: number
+  }
+}
+
+export interface JiraProject {
+  id: string
+  key: string
+  name: string
+  projectTypeKey: string
+  simplified: boolean
+  style: string
+  isPrivate: boolean
+  lead?: {
+    displayName: string
+    emailAddress: string
+  }
+  description?: string
+  avatarUrls?: {
+    '16x16': string
+    '24x24': string
+    '32x32': string
+    '48x48': string
+  }
+}
+
 class JiraApiService {
   private api: AxiosInstance
   private credentials: JiraCredentials | null = null
@@ -193,7 +247,7 @@ class JiraApiService {
     }
   }
 
-  async getIssues(projectKeys?: string[], maxResults: number = 50): Promise<any[]> {
+  async getIssues(projectKeys?: string[], maxResults: number = 50): Promise<JiraIssue[]> {
     const credentials = this.getCredentials()
     if (!credentials) {
       throw new Error('Not authenticated')
@@ -244,7 +298,7 @@ class JiraApiService {
     }
   }
 
-  async getProjects(): Promise<any[]> {
+  async getProjects(): Promise<JiraProject[]> {
     const credentials = this.getCredentials()
     if (!credentials) {
       throw new Error('Not authenticated')
@@ -274,7 +328,7 @@ class JiraApiService {
 
   // Data transformation methods
   transformWorklogsToDashboardData(worklogs: JiraWorklog[]) {
-    const developers = new Map<string, unknown>()
+    const developers = new Map<string, DeveloperData>()
     const teamHours = new Map<string, number>()
     
     worklogs.forEach(worklog => {
@@ -288,12 +342,12 @@ class JiraApiService {
           avatar: this.getInitials(author),
           team: this.detectTeam(author), // You might want to maintain a team mapping
           hours: 0,
-          tasks: new Set(),
+          tasks: new Set<string>(),
           completed: 0,
           productivity: 0,
-          trend: 'stable',
+          trend: 'stable' as const,
           lastActive: worklog.started,
-          status: 'online'
+          status: 'online' as const
         })
       }
       

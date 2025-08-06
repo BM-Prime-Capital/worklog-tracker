@@ -54,11 +54,18 @@ export default function WorklogsPage() {
       try {
         setIsDataLoading(true)
         
-        const worklogData = await jiraApi.getWorklogs(
-          format(dateRange.start, 'yyyy-MM-dd'),
-          format(dateRange.end, 'yyyy-MM-dd')
-        )
+        const startDate = format(dateRange.start, 'yyyy-MM-dd')
+        const endDate = format(dateRange.end, 'yyyy-MM-dd')
+        
+        console.log('Fetching worklogs for date range:', startDate, 'to', endDate)
+        console.log('Filter type:', filterType)
+        console.log('Selected date:', selectedDate.toISOString())
+        console.log('Date range start:', dateRange.start.toISOString())
+        console.log('Date range end:', dateRange.end.toISOString())
+        
+        const worklogData = await jiraApi.getWorklogs(startDate, endDate)
 
+        console.log('Received worklogs:', worklogData.length)
         setWorklogs(worklogData)
       } catch (error) {
         console.error('Error fetching worklogs:', error)
@@ -71,7 +78,7 @@ export default function WorklogsPage() {
     if (user) {
       fetchWorklogs()
     }
-  }, [dateRange, user])
+  }, [dateRange, user, filterType, selectedDate])
 
   const handleDateChange = (date: Date) => {
     setSelectedDate(date)

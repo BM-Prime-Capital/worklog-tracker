@@ -151,26 +151,31 @@ export default function ProjectsPage() {
         }
 
                 // Validate and filter data
-        const validProjects = Array.isArray(projectsData) ? projectsData.filter(project => 
-          project && typeof project === 'object' && project.id && project.key && project.name
-        ) : []
+        const validProjects = Array.isArray(projectsData) ? projectsData.filter(project => {
+          if (project && typeof project === 'object' && project !== null) {
+            const projectObj = project as { id?: string; key?: string; name?: string }
+            return projectObj.id && projectObj.key && projectObj.name
+          }
+          return false
+        }) : []
         
         // Fetch comprehensive stats for each project
         console.log('Fetching project stats...')
         const projectsWithStats = await Promise.all(
           validProjects.map(async (project) => {
+            const projectObj = project as { id: string; key: string; name: string; [key: string]: unknown }
             try {
-              const stats = await jiraApi.getProjectStats(project.key)
+              const stats = await jiraApi.getProjectStats(projectObj.key)
               return {
-                ...project,
+                ...projectObj,
                 totalIssues: stats.totalIssues,
                 doneIssues: stats.doneIssues,
                 progressPercentage: stats.progressPercentage
               }
             } catch (error) {
-              console.error(`Error fetching stats for project ${project.key}:`, error)
+              console.error(`Error fetching stats for project ${projectObj.key}:`, error)
               return {
-                ...project,
+                ...projectObj,
                 totalIssues: 0,
                 doneIssues: 0,
                 progressPercentage: 0
@@ -179,9 +184,13 @@ export default function ProjectsPage() {
           })
         )
         
-        let validIssues = Array.isArray(issuesData) ? issuesData.filter(issue => 
-          issue && typeof issue === 'object' && issue.id && issue.key && issue.fields
-        ) : []
+        let validIssues = Array.isArray(issuesData) ? issuesData.filter(issue => {
+          if (issue && typeof issue === 'object' && issue !== null) {
+            const issueObj = issue as { id?: string; key?: string; fields?: unknown }
+            return issueObj.id && issueObj.key && issueObj.fields
+          }
+          return false
+        }) : []
 
         // If no issues found, try to get issues from worklogs
         if (validIssues.length === 0) {
@@ -236,8 +245,8 @@ export default function ProjectsPage() {
           }
         }
 
-        setProjects(projectsWithStats)
-        setRecentIssues(validIssues)
+        setProjects(projectsWithStats as Project[])
+        setRecentIssues(validIssues as Issue[])
       } catch (error) {
         console.error('Error fetching projects data:', error)
         setProjects([])

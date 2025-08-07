@@ -53,12 +53,12 @@ export default function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
       icon: Users,
       description: 'Team management'
     },
-    {
-      name: 'Reports',
-      href: '/reports',
-      icon: BarChart3,
-      description: 'Analytics and reports'
-    },
+    // {
+    //   name: 'Reports',
+    //   href: '/reports',
+    //   icon: BarChart3,
+    //   description: 'Analytics and reports'
+    // },
     {
       name: 'Profile',
       href: '/profile',

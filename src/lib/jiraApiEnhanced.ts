@@ -119,13 +119,22 @@ class JiraApiService {
     Cookies.set('jira_credentials', JSON.stringify(credentials), { expires: 7 })
   }
 
-  getCredentials(): JiraCredentials | null {
+  async getCredentials(): Promise<JiraCredentials | null> {
     if (!this.credentials) {
-      const saved = Cookies.get('jira_credentials')
-      if (saved) {
-        this.credentials = JSON.parse(saved)
+      // Try to load from database first
+      const loaded = await this.loadCredentialsFromDatabase()
+      if (!loaded) {
+        // Fallback to cookies (for backward compatibility)
+        const saved = Cookies.get('jira_credentials')
+        if (saved) {
+          this.credentials = JSON.parse(saved)
+        }
       }
     }
+    return this.credentials
+  }
+
+  getCredentialsSync(): JiraCredentials | null {
     return this.credentials
   }
 
@@ -134,14 +143,19 @@ class JiraApiService {
     Cookies.remove('jira_credentials')
   }
 
-  isAuthenticated(): boolean {
-    return !!this.getCredentials()
+  async isAuthenticated(): Promise<boolean> {
+    const credentials = await this.getCredentials()
+    return !!credentials
+  }
+
+  isAuthenticatedSync(): boolean {
+    return !!this.getCredentialsSync()
   }
 
   // Jira API methods
   async testConnection(): Promise<boolean> {
     try {
-      const credentials = this.getCredentials()
+      const credentials = await this.getCredentials()
       if (!credentials) return false
 
       const response = await fetch('/api/jira', {
@@ -163,7 +177,7 @@ class JiraApiService {
   }
 
   async getCurrentUser(): Promise<JiraUser> {
-    const credentials = this.getCredentials()
+    const credentials = await this.getCredentials()
     if (!credentials) {
       throw new Error('Not authenticated')
     }
@@ -190,7 +204,7 @@ class JiraApiService {
     endDate: string,
     projectKeys?: string[]
   ): Promise<JiraWorklog[]> {
-    const credentials = this.getCredentials()
+    const credentials = await this.getCredentials()
     if (!credentials) {
       throw new Error('Not authenticated')
     }
@@ -219,7 +233,7 @@ class JiraApiService {
   }
 
   async getUsers(): Promise<JiraUser[]> {
-    const credentials = this.getCredentials()
+    const credentials = await this.getCredentials()
     if (!credentials) {
       throw new Error('Not authenticated')
     }
@@ -247,7 +261,7 @@ class JiraApiService {
   }
 
   async getProjects(): Promise<unknown[]> {
-    const credentials = this.getCredentials()
+    const credentials = await this.getCredentials()
     if (!credentials) {
       throw new Error('Not authenticated')
     }
@@ -275,7 +289,7 @@ class JiraApiService {
   }
 
   async getIssues(projectKeys?: string[], maxResults: number = 50): Promise<unknown[]> {
-    const credentials = this.getCredentials()
+    const credentials = await this.getCredentials()
     if (!credentials) {
       throw new Error('Not authenticated')
     }
@@ -305,7 +319,7 @@ class JiraApiService {
   }
 
   async getRecentIssues(maxResults: number = 50): Promise<unknown[]> {
-    const credentials = this.getCredentials()
+    const credentials = await this.getCredentials()
     if (!credentials) {
       throw new Error('Not authenticated')
     }
@@ -335,7 +349,7 @@ class JiraApiService {
   }
 
   async getProjectIssueCount(projectKey: string): Promise<number> {
-    const credentials = this.getCredentials()
+    const credentials = await this.getCredentials()
     if (!credentials) {
       throw new Error('Not authenticated')
     }
@@ -365,7 +379,7 @@ class JiraApiService {
   }
 
   async getProjectDoneIssuesCount(projectKey: string): Promise<number> {
-    const credentials = this.getCredentials()
+    const credentials = await this.getCredentials()
     if (!credentials) {
       throw new Error('Not authenticated')
     }
@@ -399,7 +413,7 @@ class JiraApiService {
     doneIssues: number
     progressPercentage: number
   }> {
-    const credentials = this.getCredentials()
+    const credentials = await this.getCredentials()
     if (!credentials) {
       throw new Error('Not authenticated')
     }
@@ -595,6 +609,37 @@ class JiraApiService {
     const teams = ['Frontend', 'Backend', 'Mobile', 'QA']
     const randomTeam = teams[Math.floor(Math.random() * teams.length)]
     return randomTeam
+  }
+
+  async setCredentialsFromUser(user: { jiraOrganization?: { domain: string; email: string; apiToken: string } }) {
+    if (user.jiraOrganization) {
+      this.setCredentials({
+        domain: user.jiraOrganization.domain,
+        email: user.jiraOrganization.email,
+        apiToken: user.jiraOrganization.apiToken
+      })
+    }
+  }
+
+  async loadCredentialsFromDatabase(): Promise<boolean> {
+    try {
+      const response = await fetch('/api/auth/me')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.user && data.user.jiraOrganization) {
+          this.setCredentials({
+            domain: data.user.jiraOrganization.domain,
+            email: data.user.jiraOrganization.email,
+            apiToken: data.user.jiraOrganization.apiToken
+          })
+          return true
+        }
+      }
+      return false
+    } catch (error) {
+      console.error('Error loading credentials from database:', error)
+      return false
+    }
   }
 }
 

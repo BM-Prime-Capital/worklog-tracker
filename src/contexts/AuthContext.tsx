@@ -45,9 +45,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data.user)
         setIsAuthenticated(true)
         
-        // Load Jira credentials from user profile
+        // Load Jira credentials from user profile with error handling
         if (data.user && data.user.jiraOrganization) {
-          await jiraApi.setCredentialsFromUser(data.user)
+          try {
+            await jiraApi.setCredentialsFromUser(data.user)
+          } catch (error) {
+            console.error('Failed to load Jira credentials:', error)
+            // Continue without Jira credentials - user can configure later
+          }
         }
       } else {
         setIsAuthenticated(false)
@@ -78,9 +83,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data.user)
         setIsAuthenticated(true)
         
-        // Load Jira credentials from user profile
+        // Load Jira credentials from user profile with error handling
         if (data.user && data.user.jiraOrganization) {
-          await jiraApi.setCredentialsFromUser(data.user)
+          try {
+            await jiraApi.setCredentialsFromUser(data.user)
+          } catch (error) {
+            console.error('Failed to load Jira credentials:', error)
+            // Continue without Jira credentials - user can configure later
+          }
         }
         
         return { success: true }
@@ -101,7 +111,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Logout failed:', error)
     } finally {
-      jiraApi.clearCredentials()
+      try {
+        jiraApi.clearCredentials()
+      } catch (error) {
+        console.error('Failed to clear Jira credentials:', error)
+      }
       setIsAuthenticated(false)
       setUser(null)
     }
@@ -115,9 +129,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data.user)
         setIsAuthenticated(true)
         
-        // Load Jira credentials from user profile
+        // Load Jira credentials from user profile with error handling
         if (data.user && data.user.jiraOrganization) {
-          await jiraApi.setCredentialsFromUser(data.user)
+          try {
+            await jiraApi.setCredentialsFromUser(data.user)
+          } catch (error) {
+            console.error('Failed to load Jira credentials:', error)
+            // Continue without Jira credentials - user can configure later
+          }
         }
       } else {
         setIsAuthenticated(false)

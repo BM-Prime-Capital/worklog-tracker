@@ -612,12 +612,17 @@ class JiraApiService {
   }
 
   async setCredentialsFromUser(user: { jiraOrganization?: { domain: string; email: string; apiToken: string } }) {
-    if (user.jiraOrganization) {
-      this.setCredentials({
-        domain: user.jiraOrganization.domain,
-        email: user.jiraOrganization.email,
-        apiToken: user.jiraOrganization.apiToken
-      })
+    try {
+      if (user.jiraOrganization) {
+        this.setCredentials({
+          domain: user.jiraOrganization.domain,
+          email: user.jiraOrganization.email,
+          apiToken: user.jiraOrganization.apiToken
+        })
+      }
+    } catch (error) {
+      console.error('Error setting credentials from user:', error)
+      throw error
     }
   }
 

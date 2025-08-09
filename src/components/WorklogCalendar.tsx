@@ -92,7 +92,7 @@ export default function WorklogCalendar({ selectedDate, filterType, onDateChange
   }
 
   const getDayClassName = (date: Date) => {
-    const baseClasses = "w-10 h-10 flex items-center justify-center text-sm font-medium rounded-lg cursor-pointer transition-all duration-200"
+    const baseClasses = "w-full h-10 flex items-center justify-center text-sm font-medium rounded-lg cursor-pointer transition-all duration-200"
     
     if (!isSameMonth(date, currentMonth)) {
       return `${baseClasses} text-gray-300`
@@ -133,10 +133,10 @@ export default function WorklogCalendar({ selectedDate, filterType, onDateChange
       </div>
 
       {/* Calendar Grid */}
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-1 w-full">
         {/* Day headers */}
         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-          <div key={day} className="w-10 h-10 flex items-center justify-center text-xs font-medium text-gray-500">
+          <div key={day} className="flex items-center justify-center text-xs font-medium text-gray-500 h-10">
             {day}
           </div>
         ))}
@@ -147,7 +147,7 @@ export default function WorklogCalendar({ selectedDate, filterType, onDateChange
           const hasWorklogData = hasWorklogs(day)
           
           return (
-            <div key={index} className="relative">
+            <div key={index} className="relative w-full h-10 flex justify-center">
               <button
                 onClick={() => handleDateClick(day)}
                 className={getDayClassName(day)}
@@ -157,7 +157,7 @@ export default function WorklogCalendar({ selectedDate, filterType, onDateChange
               
               {/* Hours indicator */}
               {hasWorklogData && hours > 0 && (
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center z-10">
                   <span className="text-xs text-white font-bold">
                     {hours >= 8 ? '8+' : Math.round(hours)}
                   </span>

@@ -226,7 +226,11 @@ export default function Dashboard() {
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold text-gray-900">Weekly Hours Overview</h2>
               </div>
-              <WeeklyChart />
+              <WeeklyChart 
+                developers={dashboardData.developers} 
+                isLoading={isLoading}
+                dateRange={selectedDateRange as 'this-week' | 'last-week' | 'this-month'}
+              />
             </div>
           </div>
 

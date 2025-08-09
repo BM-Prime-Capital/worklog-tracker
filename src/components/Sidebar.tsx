@@ -8,7 +8,7 @@ import {
   Calendar, 
   Users, 
   User, 
-  Settings, 
+  Trophy, 
   LogOut, 
   ChevronLeft, 
   ChevronRight,
@@ -53,12 +53,12 @@ export default function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
       icon: Users,
       description: 'Team management'
     },
-    // {
-    //   name: 'Reports',
-    //   href: '/reports',
-    //   icon: BarChart3,
-    //   description: 'Analytics and reports'
-    // },
+    {
+      name: 'Rewards',
+      href: '/rewards',
+      icon: Trophy,
+      description: 'Performance rewards'
+    },
     {
       name: 'Profile',
       href: '/profile',
@@ -155,18 +155,6 @@ export default function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
 
       {/* Bottom Section */}
       <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-white">
-        {!isCollapsed && (
-          <div className="mb-4">
-            <Link
-              href="/settings"
-              className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200"
-            >
-              <Settings className="w-5 h-5 text-gray-400" />
-              <span className="text-sm font-medium">Settings</span>
-            </Link>
-          </div>
-        )}
-        
         <button
           onClick={handleLogout}
           className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-red-50 hover:text-red-700 transition-all duration-200 w-full ${

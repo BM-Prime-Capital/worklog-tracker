@@ -21,6 +21,16 @@ export interface JiraWorklog {
   timeSpent: string
   started: string
   comment?: string
+  attachments?: JiraAttachment[]
+}
+
+export interface JiraAttachment {
+  id: string
+  filename: string
+  mimeType: string
+  size: number
+  url: string
+  thumbnailUrl?: string
 }
 
 export interface JiraIssue {

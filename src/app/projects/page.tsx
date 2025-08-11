@@ -113,6 +113,8 @@ export default function ProjectsPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set())
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   // Fetch projects and recent issues from Jira
   useEffect(() => {
@@ -359,6 +361,93 @@ export default function ProjectsPage() {
     return { total, done, progressPercentage }
   }
 
+  const openProjectModal = (project: Project) => {
+    setSelectedProject(project)
+    setIsModalOpen(true)
+  }
+
+  const closeProjectModal = () => {
+    setSelectedProject(null)
+    setIsModalOpen(false)
+  }
+
+  const getRecentTasksForProject = (projectKey: string) => {
+    console.log('getRecentTasksForProject called with:', projectKey)
+    console.log('recentIssues available:', recentIssues.length)
+    
+    if (recentIssues.length === 0) {
+      console.log('No recent issues available')
+      return []
+    }
+    
+    // Filter issues by project key - try multiple matching strategies
+    const projectIssues = recentIssues.filter(issue => {
+      const issueProjectKey = issue?.fields?.project?.key
+      const issueKey = issue?.key
+      
+      // Check if issue key starts with project key (e.g., "PROJ-123" for project "PROJ")
+      const keyMatches = issueKey && issueKey.startsWith(projectKey + '-')
+      // Check if project key matches exactly
+      const projectMatches = issueProjectKey === projectKey
+      
+      const matches = keyMatches || projectMatches
+      console.log(`Issue ${issueKey}: project key=${issueProjectKey}, key starts with ${projectKey}-=${keyMatches}, project matches=${projectMatches}, final match=${matches}`)
+      
+      return matches
+    })
+    
+    console.log(`Found ${projectIssues.length} issues for project ${projectKey}`)
+    
+    if (projectIssues.length === 0) {
+      // If no issues found by project key, try to find issues that might be related
+      console.log('No direct project matches, checking for related issues...')
+      const relatedIssues = recentIssues.filter(issue => {
+        const issueKey = issue?.key
+        return issueKey && issueKey.includes(projectKey)
+      })
+      console.log(`Found ${relatedIssues.length} potentially related issues`)
+      return relatedIssues.slice(0, 10)
+    }
+    
+    // Sort by creation date (most recent first) and take first 10
+    const sortedIssues = projectIssues.sort((a, b) => {
+      const dateA = new Date(a?.fields?.created || 0)
+      const dateB = new Date(b?.fields?.created || 0)
+      return dateB.getTime() - dateA.getTime() // Most recent first
+    })
+    
+    const result = sortedIssues.slice(0, 10)
+    console.log(`Returning ${result.length} most recent issues for project ${projectKey}`)
+    
+    return result
+  }
+
+  // Handle escape key to close modal
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isModalOpen) {
+        closeProjectModal()
+      }
+    }
+
+    if (isModalOpen) {
+      document.addEventListener('keydown', handleEscape)
+      document.body.style.overflow = 'hidden' // Prevent background scrolling
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape)
+      document.body.style.overflow = 'unset'
+    }
+  }, [isModalOpen])
+
+  // Handle click outside modal to close
+  const handleModalBackdropClick = (event: React.MouseEvent) => {
+    if (event.target === event.currentTarget) {
+      closeProjectModal()
+    }
+  }
+
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
@@ -578,7 +667,10 @@ export default function ProjectsPage() {
 
                   {/* Actions */}
                   <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                    <button className="text-blue-600 hover:text-blue-700 text-sm font-medium transition-colors">
+                    <button 
+                      onClick={() => openProjectModal(project)}
+                      className="text-blue-600 hover:text-blue-700 text-sm font-medium transition-colors"
+                    >
                       View Details
                     </button>
                     <button className="text-gray-400 hover:text-blue-600 transition-colors">
@@ -714,6 +806,276 @@ export default function ProjectsPage() {
           </div>
         </div>
       </div>
+
+      {/* Project Details Modal */}
+      {isModalOpen && selectedProject && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={handleModalBackdropClick}>
+          <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">{selectedProject.name}</h2>
+                <p className="text-gray-600">Project Details & Recent Tasks</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {recentIssues.length} total issues available
+                </p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => window.location.reload()}
+                  className="text-gray-400 hover:text-blue-600 transition-colors p-1"
+                  title="Refresh data"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+                <button
+                  onClick={closeProjectModal}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6">
+              {/* Project Overview */}
+              <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-blue-900">Project Overview</h3>
+                    <p className="text-sm text-blue-700">
+                      {selectedProject.description || 'No description available'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-blue-900">{selectedProject.key}</div>
+                    <div className="text-sm text-blue-600">{selectedProject.projectTypeKey}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Project Summary Section */}
+              <div className="mb-8">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Project Summary</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Project Key & Type */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-blue-100 text-blue-800">
+                        {selectedProject.key}
+                      </span>
+                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getProjectTypeColor(selectedProject.projectTypeKey)}`}>
+                        {selectedProject.projectTypeKey}
+                      </span>
+                    </div>
+                    {selectedProject.description && (
+                      <p className="text-sm text-gray-600 mt-2">{selectedProject.description}</p>
+                    )}
+                  </div>
+
+                  {/* Project Stats */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-gray-900">{selectedProject.totalIssues || 0}</p>
+                        <p className="text-xs text-gray-600">Total Issues</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-green-600">{selectedProject.doneIssues || 0}</p>
+                        <p className="text-xs text-gray-600">Completed</p>
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <div className="flex justify-between text-xs text-gray-600 mb-1">
+                        <span>Progress</span>
+                        <span>{selectedProject.progressPercentage || 0}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${selectedProject.progressPercentage || 0}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Project Lead */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Project Lead</h4>
+                    {selectedProject.lead ? (
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
+                          {selectedProject.lead.displayName.split(' ').map(n => n[0]).join('').toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{selectedProject.lead.displayName}</p>
+                          <p className="text-xs text-gray-600">{selectedProject.lead.emailAddress}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500">No project lead assigned</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Tasks Section */}
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Recent Issues for {selectedProject.key}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      {(() => {
+                        const recentTasks = getRecentTasksForProject(selectedProject.key)
+                        if (recentTasks.length > 0) {
+                          const firstIssue = recentTasks[0]
+                          const issueKey = firstIssue?.key
+                          const projectKey = firstIssue?.fields?.project?.key
+                          
+                          if (projectKey === selectedProject.key) {
+                            return `${recentTasks.length} project-specific issues found`
+                          } else if (issueKey && issueKey.startsWith(selectedProject.key + '-')) {
+                            return `${recentTasks.length} issues with matching key pattern found`
+                          } else {
+                            return `${recentTasks.length} related issues found`
+                          }
+                        } else {
+                          return 'No issues found for this project'
+                        }
+                      })()}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                      {getRecentTasksForProject(selectedProject.key).length} issues
+                    </span>
+                  </div>
+                </div>
+                {(() => {
+                  const recentTasks = getRecentTasksForProject(selectedProject.key)
+                  console.log(`Recent tasks for ${selectedProject.key}:`, recentTasks) // Debug log
+                  
+                  if (recentTasks.length > 0) {
+                    return (
+                      <div className="space-y-4">
+                        {recentTasks.map((task, index) => (
+                          <div key={task.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-md transition-all duration-200">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-3">
+                                  <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                                    {task.key}
+                                  </span>
+                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                    task?.fields?.status?.statusCategory?.key === 'done' ? 'bg-green-100 text-green-800 border border-green-200' :
+                                    task?.fields?.status?.statusCategory?.key === 'indeterminate' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
+                                    task?.fields?.status?.statusCategory?.key === 'new' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                    'bg-gray-100 text-gray-800 border border-gray-200'
+                                  }`}>
+                                    {task?.fields?.status?.statusCategory?.key || 'Unknown'}
+                                  </span>
+                                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">#{index + 1}</span>
+                                  {task?.fields?.project?.key && task?.fields?.project?.key !== selectedProject.key && (
+                                    <span className="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded-full border border-orange-200">
+                                      From: {task.fields.project.key}
+                                    </span>
+                                  )}
+                                </div>
+                                <h4 className="text-base font-semibold text-gray-900 mb-2 leading-tight">
+                                  {task?.fields?.summary || 'No title'}
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                                  <div className="flex items-center space-x-2">
+                                    <Users className="w-4 h-4 text-gray-500" />
+                                    <span className="text-gray-600">
+                                      <span className="font-medium">Assignee:</span> {task?.fields?.assignee?.displayName || 'Unassigned'}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Calendar className="w-4 h-4 text-gray-500" />
+                                    <span className="text-gray-600">
+                                      <span className="font-medium">Created:</span> {task?.fields?.created ? formatDate(task.fields.created) : 'Unknown'}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Clock className="w-4 h-4 text-gray-500" />
+                                    <span className="text-gray-600">
+                                      <span className="font-medium">Updated:</span> {task?.fields?.updated ? formatDate(task.fields.updated) : 'Unknown'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              <button className="text-gray-400 hover:text-blue-600 transition-colors ml-3 p-2 hover:bg-blue-50 rounded-lg">
+                                <ExternalLink className="w-5 h-5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  } else {
+                    return (
+                      <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                        <Activity className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                        <h4 className="text-lg font-medium text-gray-900 mb-2">No Recent Issues Found</h4>
+                        <p className="text-gray-500 mb-4">
+                          No recent issues found for project <span className="font-medium">{selectedProject.key}</span>
+                        </p>
+                        <p className="text-xs text-gray-400 mb-4">
+                          Total issues available: {recentIssues.length} | 
+                          Project key: {selectedProject.key}
+                        </p>
+                        
+                        {/* Show sample of available issues for debugging */}
+                        {recentIssues.length > 0 && (
+                          <div className="mt-6 text-left max-w-2xl mx-auto">
+                            <p className="text-sm font-medium text-gray-700 mb-3 text-center">Available Issues (Sample)</p>
+                            <div className="space-y-2 max-h-40 overflow-y-auto bg-white p-3 rounded-lg border">
+                              {recentIssues.slice(0, 8).map((issue, index) => (
+                                <div key={index} className="text-xs bg-gray-50 p-2 rounded border-l-2 border-blue-200">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-medium text-blue-700">{issue?.key}</span>
+                                    <span className="text-gray-500">
+                                      Project: {issue?.fields?.project?.key || 'Unknown'}
+                                    </span>
+                                  </div>
+                                  <p className="text-gray-600 mt-1 line-clamp-2">
+                                    {issue?.fields?.summary || 'No summary'}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                            <p className="text-xs text-gray-500 text-center mt-2">
+                              This shows all available issues to help debug the filtering
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }
+                })()}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end p-6 border-t border-gray-200">
+              <button
+                onClick={closeProjectModal}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   )
 }

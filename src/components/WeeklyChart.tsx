@@ -227,6 +227,7 @@ export default function WeeklyChart({ developers = [], isLoading = false, dateRa
           <Line 
             type="monotone" 
             dataKey="totalHours" 
+            name="Total Hours"
             stroke="#3b82f6" 
             strokeWidth={2}
             dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
@@ -244,7 +245,7 @@ export default function WeeklyChart({ developers = [], isLoading = false, dateRa
           <YAxis stroke="#6b7280" fontSize={12} />
           <Tooltip content={<CustomTooltip />} />
           <Legend />
-          <Bar dataKey="totalHours" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="totalHours" name="Total Hours" fill="#3b82f6" radius={[4, 4, 0, 0]} />
         </BarChart>
       )
     }
@@ -260,6 +261,7 @@ export default function WeeklyChart({ developers = [], isLoading = false, dateRa
           <Area 
             type="monotone" 
             dataKey="totalHours" 
+            name="Total Hours"
             stroke="#3b82f6" 
             fill="#3b82f6" 
             fillOpacity={0.3}
@@ -326,6 +328,7 @@ export default function WeeklyChart({ developers = [], isLoading = false, dateRa
         <Line 
           type="monotone" 
           dataKey="totalHours" 
+          name="Total Hours"
           stroke="#3b82f6" 
           strokeWidth={2}
           dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}

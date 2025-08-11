@@ -27,8 +27,8 @@ export default function DashboardPage() {
   }
 
   if (!isAuthenticated) {
-    return null // Will redirect to login
+    return null // Will redirect to log in
   }
 
   return <Dashboard />
-} 
+}

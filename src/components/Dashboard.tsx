@@ -10,11 +10,13 @@ import ProjectWorklogs from './ProjectWorklogs'
 import DeveloperWorklogDetails from './DeveloperWorklogDetails'
 import DateRangePicker from './DateRangePicker'
 import DashboardLayout from './DashboardLayout'
+import ExportModal from './ExportModal'
 import { useAuth } from '@/contexts/AuthContextNew'
-import { jiraApiEnhanced as jiraApi } from '@/lib/jiraApiEnhanced'
+import { jiraApiEnhanced as jiraApi, JiraWorklog } from '@/lib/jiraApiEnhanced'
 import { format, subDays, startOfWeek, endOfWeek } from 'date-fns'
 import { Developer } from '@/lib/types'
 import JiraTestPanel from './JiraTestPanel'
+import PDFExportService from '@/lib/pdfExportService'
 
 // Process worklogs to extract only real data from Jira API
 const processWorklogs = (worklogs: {
@@ -93,6 +95,8 @@ export default function Dashboard() {
     tasksCompleted: 0
   })
   const [showTestPanel, setShowTestPanel] = useState(false)
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false)
+  const [worklogs, setWorklogs] = useState<JiraWorklog[]>([])
 
   // Fetch data based on date range
   useEffect(() => {
@@ -100,46 +104,41 @@ export default function Dashboard() {
       try {
         setIsLoading(true)
         
-        // Calculate date range
+        // Get date range
+        let startDate: string, endDate: string
         const now = new Date()
-        let startDate: Date, endDate: Date
         
         switch (selectedDateRange) {
-          case 'today':
-            startDate = now
-            endDate = now
-            break
-          case 'yesterday':
-            startDate = subDays(now, 1)
-            endDate = subDays(now, 1)
-            break
           case 'this-week':
-            startDate = startOfWeek(now, { weekStartsOn: 1 })
-            endDate = endOfWeek(now, { weekStartsOn: 1 })
+            startDate = format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd')
+            endDate = format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd')
             break
           case 'last-week':
-            startDate = startOfWeek(subDays(now, 7), { weekStartsOn: 1 })
-            endDate = endOfWeek(subDays(now, 7), { weekStartsOn: 1 })
+            const lastWeek = subDays(now, 7)
+            startDate = format(startOfWeek(lastWeek, { weekStartsOn: 1 }), 'yyyy-MM-dd')
+            endDate = format(endOfWeek(lastWeek, { weekStartsOn: 1 }), 'yyyy-MM-dd')
+            break
+          case 'this-month':
+            startDate = format(new Date(now.getFullYear(), now.getMonth(), 1), 'yyyy-MM-dd')
+            endDate = format(new Date(now.getFullYear(), now.getMonth() + 1, 0), 'yyyy-MM-dd')
             break
           default:
-            startDate = startOfWeek(now, { weekStartsOn: 1 })
-            endDate = endOfWeek(now, { weekStartsOn: 1 })
+            startDate = format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd')
+            endDate = format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd')
         }
 
-        const worklogs = await jiraApi.getWorklogs(
-          format(startDate, 'yyyy-MM-dd'),
-          format(endDate, 'yyyy-MM-dd')
-        )
-
-        const transformedData = processWorklogs(worklogs)
-
-        console.log("Transformed Data ===>", transformedData)
+        // Fetch worklogs
+        const worklogData = await jiraApi.getWorklogs(startDate, endDate)
+        setWorklogs(worklogData)
+        
+        // Process worklogs for dashboard
+        const processed = processWorklogs(worklogData)
         
         setDashboardData({
-          developers: transformedData.developers,
-          totalHours: transformedData.totalHours,
-          activeDevelopers: transformedData.developers.length,
-          tasksCompleted: transformedData.developers.reduce((sum, dev) => sum + dev.tasks, 0)
+          developers: processed.developers,
+          totalHours: processed.totalHours,
+          activeDevelopers: processed.developers.length,
+          tasksCompleted: processed.developers.reduce((sum, dev) => sum + dev.tasks, 0)
         })
       } catch (error) {
         console.error('Error fetching dashboard data:', error)
@@ -148,8 +147,53 @@ export default function Dashboard() {
       }
     }
 
-    fetchData()
-  }, [selectedDateRange])
+    if (user) {
+      fetchData()
+    }
+  }, [selectedDateRange, user])
+
+  const handleExport = async (exportOptions: {
+    startDate: Date
+    endDate: Date
+    includeIndividualReports: boolean
+    exportTimestamp: Date
+  }) => {
+    try {
+      const pdfService = new PDFExportService()
+      
+      // Filter worklogs for the export period
+      const filteredWorklogs = worklogs.filter(worklog => {
+        const worklogTime = new Date(worklog.started).getTime()
+        const startTime = exportOptions.startDate.getTime()
+        const endTime = exportOptions.endDate.getTime()
+        return worklogTime >= startTime && worklogTime <= endTime
+      })
+
+      // Generate PDF
+      const pdfBlob = await pdfService.exportWorklogReport({
+        startDate: exportOptions.startDate,
+        endDate: exportOptions.endDate,
+        worklogs: filteredWorklogs,
+        exportTimestamp: exportOptions.exportTimestamp,
+        includeIndividualReports: exportOptions.includeIndividualReports
+      })
+
+      // Create download link
+      const url = window.URL.createObjectURL(pdfBlob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `worklog-tracker-dashboard-report-${format(exportOptions.startDate, 'yyyy-MM-dd')}-to-${format(exportOptions.endDate, 'yyyy-MM-dd')}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      console.log('PDF export completed successfully')
+    } catch (error) {
+      console.error('PDF export failed:', error)
+      throw new Error('Failed to generate PDF report')
+    }
+  }
 
   return (
     <DashboardLayout
@@ -167,7 +211,10 @@ export default function Dashboard() {
           >
             Test Jira
           </button>
-          <button className="flex items-center px-3 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-sm hover:shadow-md text-sm">
+          <button 
+            onClick={() => setIsExportModalOpen(true)}
+            className="flex items-center px-3 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-sm hover:shadow-md text-sm"
+          >
             <Download className="w-4 h-4 mr-2" />
             Export
           </button>
@@ -255,6 +302,13 @@ export default function Dashboard() {
           <DeveloperList developers={dashboardData.developers} isLoading={isLoading} />
         </div>
       </div>
+
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        worklogs={worklogs}
+        onExport={handleExport}
+      />
     </DashboardLayout>
   )
 } 

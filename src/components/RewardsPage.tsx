@@ -1,15 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { 
-  Trophy, 
-  Crown, 
-  Star, 
-  Zap, 
-  Target, 
-  TrendingUp, 
-  Clock, 
-  Users, 
+import {
+  Trophy,
+  Crown,
+  Star,
+  Zap,
+  Target,
+  TrendingUp,
+  Clock,
+  Users,
   Medal,
   Sparkles,
   Heart
@@ -66,12 +66,12 @@ export default function RewardsPage() {
       tasks: Set<string>
       worklogs: typeof worklogs
     }>()
-    
+
     worklogs.forEach(worklog => {
       const author = worklog.author.displayName
       const authorEmail = worklog.author.emailAddress
       const hours = worklog.timeSpentSeconds / 3600
-      
+
       if (!developers.has(author)) {
         developers.set(author, {
           id: worklog.author.accountId || `dev-${Date.now()}-${Math.random()}`,
@@ -82,13 +82,13 @@ export default function RewardsPage() {
           worklogs: []
         })
       }
-      
+
       const dev = developers.get(author)!
       dev.hours += hours
       dev.tasks.add(worklog.issueKey)
       dev.worklogs.push(worklog)
     })
-    
+
     return Array.from(developers.values()).map(dev => ({
       id: dev.id,
       name: dev.name,
@@ -102,7 +102,7 @@ export default function RewardsPage() {
   // Generate rewards and rankings
   const generateRewards = (developers: Developer[]): RankedDeveloper[] => {
     const sortedDevelopers = [...developers].sort((a, b) => b.hours - a.hours)
-    
+
     return sortedDevelopers.map((dev, index) => {
       const rank = index + 1
       let reward = ''
@@ -191,12 +191,12 @@ export default function RewardsPage() {
     const fetchData = async () => {
       try {
         setIsLoading(true)
-        
+
         // Calculate current week
         const now = new Date()
         const startDate = startOfWeek(now, { weekStartsOn: 1 })
         const endDate = endOfWeek(now, { weekStartsOn: 1 })
-        
+
         const worklogs = await jiraApi.getWorklogs(
           format(startDate, 'yyyy-MM-dd'),
           format(endDate, 'yyyy-MM-dd')
@@ -204,13 +204,13 @@ export default function RewardsPage() {
 
         const developers = processWorklogs(worklogs)
         const ranked = generateRewards(developers)
-        
+
         setRankedDevelopers(ranked)
-        
+
         // Calculate weekly stats
         const totalHours = ranked.reduce((sum, dev) => sum + dev.hours, 0)
         const averageHours = ranked.length > 0 ? totalHours / ranked.length : 0
-        
+
         setWeeklyStats({
           totalHours,
           averageHours,
@@ -249,7 +249,7 @@ export default function RewardsPage() {
 
   return (
     <DashboardLayout
-      title="🏆 Weekly Rewards"
+      title="Weekly Rewards"
       subtitle="Celebrating team performance and achievements"
     >
       <div className="max-w-7xl mx-auto">
@@ -273,7 +273,7 @@ export default function RewardsPage() {
                   <Clock className="w-8 h-8 text-yellow-100" />
                 </div>
               </div>
-              
+
               <div className="bg-gradient-to-br from-blue-400 to-blue-500 rounded-xl p-6 text-white">
                 <div className="flex items-center justify-between">
                   <div>
@@ -283,7 +283,7 @@ export default function RewardsPage() {
                   <Users className="w-8 h-8 text-blue-100" />
                 </div>
               </div>
-              
+
               <div className="bg-gradient-to-br from-green-400 to-green-500 rounded-xl p-6 text-white">
                 <div className="flex items-center justify-between">
                   <div>
@@ -293,7 +293,7 @@ export default function RewardsPage() {
                   <Trophy className="w-8 h-8 text-green-100" />
                 </div>
               </div>
-              
+
               <div className="bg-gradient-to-br from-purple-400 to-purple-500 rounded-xl p-6 text-white">
                 <div className="flex items-center justify-between">
                   <div>
@@ -356,7 +356,7 @@ export default function RewardsPage() {
                           <p className="text-2xl font-bold text-gray-900">{developer.hours}h</p>
                           <p className="text-sm text-gray-500">{developer.tasks} tasks</p>
                         </div>
-                        
+
                         <div className="flex flex-col items-center">
                           <div className={`${developer.rewardColor} text-lg font-semibold`}>
                             {developer.reward}
@@ -395,7 +395,7 @@ export default function RewardsPage() {
               <div className="text-center">
                 <h3 className="text-xl font-bold mb-2">🎉 Congratulations Team! 🎉</h3>
                 <p className="text-purple-100">
-                  You&apos;ve all contributed to another amazing week of productivity. 
+                  You&apos;ve all contributed to another amazing week of productivity.
                   Keep up the great work and continue pushing your limits!
                 </p>
               </div>
@@ -405,4 +405,4 @@ export default function RewardsPage() {
       </div>
     </DashboardLayout>
   )
-} 
+}

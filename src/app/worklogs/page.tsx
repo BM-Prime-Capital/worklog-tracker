@@ -10,6 +10,8 @@ import WorklogCalendar from '@/components/WorklogCalendar'
 import WorklogTable from '@/components/WorklogTable'
 import WorklogStats from '@/components/WorklogStats'
 import DashboardLayout from '@/components/DashboardLayout'
+import ExportModal from '@/components/ExportModal'
+import PDFExportService from '@/lib/pdfExportService'
 
 export default function WorklogsPage() {
   const { user, isLoading, isAuthenticated } = useAuth()
@@ -22,6 +24,7 @@ export default function WorklogsPage() {
     start: startOfWeek(new Date(), { weekStartsOn: 1 }),
     end: endOfWeek(new Date(), { weekStartsOn: 1 })
   })
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false)
 
   // Calculate date range based on filter type
   useEffect(() => {
@@ -53,16 +56,16 @@ export default function WorklogsPage() {
     const fetchWorklogs = async () => {
       try {
         setIsDataLoading(true)
-        
+
         const startDate = format(dateRange.start, 'yyyy-MM-dd')
         const endDate = format(dateRange.end, 'yyyy-MM-dd')
-        
-        console.log('Fetching worklogs for date range:', startDate, 'to', endDate)
-        console.log('Filter type:', filterType)
-        console.log('Selected date:', selectedDate.toISOString())
-        console.log('Date range start:', dateRange.start.toISOString())
-        console.log('Date range end:', dateRange.end.toISOString())
-        
+
+        // console.log('Fetching worklogs for date range:', startDate, 'to', endDate)
+        // console.log('Filter type:', filterType)
+        // console.log('Selected date:', selectedDate.toISOString())
+        // console.log('Date range start:', dateRange.start.toISOString())
+        // console.log('Date range end:', dateRange.end.toISOString())
+
         const worklogData = await jiraApi.getWorklogs(startDate, endDate)
 
         console.log('Received worklogs:', worklogData.length)
@@ -115,6 +118,49 @@ export default function WorklogsPage() {
     return issues.size
   }
 
+  const handleExport = async (exportOptions: {
+    startDate: Date
+    endDate: Date
+    includeIndividualReports: boolean
+    exportTimestamp: Date
+  }) => {
+    try {
+      const pdfService = new PDFExportService()
+      
+      // Filter worklogs for the export period
+      const filteredWorklogs = worklogs.filter(worklog => {
+        const worklogTime = new Date(worklog.started).getTime()
+        const startTime = exportOptions.startDate.getTime()
+        const endTime = exportOptions.endDate.getTime()
+        return worklogTime >= startTime && worklogTime <= endTime
+      })
+
+      // Generate PDF
+      const pdfBlob = await pdfService.exportWorklogReport({
+        startDate: exportOptions.startDate,
+        endDate: exportOptions.endDate,
+        worklogs: filteredWorklogs,
+        exportTimestamp: exportOptions.exportTimestamp,
+        includeIndividualReports: exportOptions.includeIndividualReports
+      })
+
+      // Create download link
+      const url = window.URL.createObjectURL(pdfBlob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `worklog-report-${format(exportOptions.startDate, 'yyyy-MM-dd')}-to-${format(exportOptions.endDate, 'yyyy-MM-dd')}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      console.log('PDF export completed successfully')
+    } catch (error) {
+      console.error('PDF export failed:', error)
+      throw new Error('Failed to generate PDF report')
+    }
+  }
+
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
@@ -131,7 +177,10 @@ export default function WorklogsPage() {
       title="Worklog Details"
       subtitle="Detailed view of time tracking and worklog entries"
       actions={
-        <button className="flex items-center px-3 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-sm hover:shadow-md text-sm">
+        <button 
+          onClick={() => setIsExportModalOpen(true)}
+          className="flex items-center px-3 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-sm hover:shadow-md text-sm"
+        >
           <Download className="w-4 h-4 mr-2" />
           Export Data
         </button>
@@ -143,7 +192,7 @@ export default function WorklogsPage() {
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="flex items-center space-x-4">
               <h2 className="text-lg font-semibold text-gray-900">Filter Worklogs</h2>
-              
+
               {/* Filter Type Buttons */}
               <div className="flex items-center space-x-2">
                 <button
@@ -220,6 +269,14 @@ export default function WorklogsPage() {
           />
         </div>
       </div>
+
+      {/* Export Modal */}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        worklogs={worklogs}
+        onExport={handleExport}
+      />
     </DashboardLayout>
   )
-} 
+}

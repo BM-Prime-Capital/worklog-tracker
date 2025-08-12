@@ -44,55 +44,103 @@ export interface StatsCardData {
 export interface User {
   // Core Identity
   id: string
-  accountId: string // Jira account ID
-  email: string
-  username: string // @bmprimecapital.com username part
+  accountId?: string // Jira account ID for integration
+  jiraId?: string // Jira user ID for better matching
   
   // Personal Information
   firstName: string
   lastName: string
   displayName: string
-  avatar?: string
+  email: string
+  gender: 'male' | 'female' | 'other' | 'prefer-not-to-say'
+  dateOfBirth?: Date
   phoneNumber?: string
+  emergencyContact?: {
+    name: string
+    relationship: string
+    phone: string
+    email?: string
+  }
   
-  // Professional Details
-  department: 'software-engineering' | 'venture-capital' | 'graphic-design' | 'communication'
-  employmentType: 'intern' | 'permanent'
+  // Professional Information
   role: string
   title: string
-  employeeId?: string
-  hireDate?: string
+  department: 'software-engineering' | 'venture-capital' | 'graphic-design' | 'communication'
+  employmentType: 'intern' | 'permanent' | 'contractor' | 'consultant'
+  employmentStatus: 'active' | 'inactive' | 'terminated' | 'resigned' | 'on-leave'
+  hireDate: Date
+  probationEndDate?: Date
+  contractEndDate?: Date
   managerId?: string
+  directReports?: string[]
+  
+  // Remote Work & Location
+  workLocation: 'remote' | 'hybrid' | 'office'
+  country: string
+  city: string
+  timezone: string
+  address?: {
+    street: string
+    city: string
+    state: string
+    postalCode: string
+    country: string
+  }
   
   // System Access & Permissions
-  isActive: boolean
-  isAdmin: boolean
   permissions: UserPermission[]
-  accessLevel: 'basic' | 'manager' | 'admin' | 'super-admin'
+  accessLevel: 'basic' | 'standard' | 'admin' | 'super-admin'
+  isActive: boolean
+  lastLogin?: Date
   
   // Integration Status
   jiraEnabled: boolean
-  jiraLastSync?: string
-  otherTools: IntegrationStatus[]
+  jiraUsername?: string
+  slackEnabled?: boolean
+  slackUsername?: string
+  githubEnabled?: boolean
+  githubUsername?: string
   
-  // Work & Activity
-  timezone: string
+  // Working Hours & Schedule
   workingHours: WorkingHours
-  currentProjects: string[] // Project IDs
+  preferredWorkingHours?: {
+    startTime: string // HH:mm format
+    endTime: string // HH:mm format
+    timezone: string
+  }
+  
+  // Performance & Skills
+  performanceMetrics: PerformanceMetrics
   skills: Skill[]
   certifications: Certification[]
+  languages: Array<{
+    language: string
+    proficiency: 'basic' | 'intermediate' | 'fluent' | 'native'
+  }>
   
-  // Performance & Metrics
-  performanceMetrics: PerformanceMetrics
-  worklogStats: WorklogStats
+  // Compensation & Benefits
+  salary?: {
+    amount: number
+    currency: string
+    frequency: 'monthly' | 'yearly'
+    effectiveDate: Date
+  }
+  benefits?: string[]
+  
+  // HR & Administrative
+  employeeId: string
+  taxId?: string
+  socialSecurityNumber?: string
+  passportNumber?: string
+  visaStatus?: string
+  visaExpiryDate?: Date
   
   // System Metadata
-  createdAt: string
-  updatedAt: string
-  lastLoginAt?: string
-  lastActivityAt?: string
-  createdBy?: string
-  updatedBy?: string
+  createdBy: string
+  createdAt: Date
+  updatedBy: string
+  updatedAt: Date
+  version: number
 }
 
 export interface UserPermission {
@@ -167,24 +215,66 @@ export interface CreateUserRequest {
   firstName: string
   lastName: string
   email: string
-  department: User['department']
-  employmentType: User['employmentType']
-  role?: string
-  title?: string
+  gender: 'male' | 'female' | 'other' | 'prefer-not-to-say'
+  role: string
+  title: string
+  department: 'software-engineering' | 'venture-capital' | 'graphic-design' | 'communication'
+  employmentType: 'intern' | 'permanent' | 'contractor' | 'consultant'
+  employmentStatus: 'active' | 'inactive' | 'terminated' | 'resigned' | 'on-leave'
+  hireDate: Date
+  workLocation: 'remote' | 'hybrid' | 'office'
+  country: string
+  city: string
+  timezone: string
+  employeeId: string
+  jiraId?: string
+  accountId?: string
+  phoneNumber?: string
+  probationEndDate?: Date
+  contractEndDate?: Date
   managerId?: string
-  permissions?: Partial<UserPermission>[]
+  permissions?: UserPermission[]
+  accessLevel?: 'basic' | 'standard' | 'admin' | 'super-admin'
+  workingHours?: WorkingHours
+  skills?: Skill[]
+  languages?: Array<{
+    language: string
+    proficiency: 'basic' | 'intermediate' | 'fluent' | 'native'
+  }>
 }
 
 export interface UpdateUserRequest {
   firstName?: string
   lastName?: string
-  department?: User['department']
-  employmentType?: User['employmentType']
+  email?: string
+  gender?: 'male' | 'female' | 'other' | 'prefer-not-to-say'
   role?: string
   title?: string
+  department?: 'software-engineering' | 'venture-capital' | 'graphic-design' | 'communication'
+  employmentType?: 'intern' | 'permanent' | 'contractor' | 'consultant'
+  employmentStatus?: 'active' | 'inactive' | 'terminated' | 'resigned' | 'on-leave'
+  hireDate?: Date
+  workLocation?: 'remote' | 'hybrid' | 'office'
+  country?: string
+  city?: string
+  timezone?: string
+  employeeId?: string
+  jiraId?: string
+  accountId?: string
+  phoneNumber?: string
+  probationEndDate?: Date
+  contractEndDate?: Date
   managerId?: string
+  permissions?: UserPermission[]
+  accessLevel?: 'basic' | 'standard' | 'admin' | 'super-admin'
+  workingHours?: WorkingHours
+  skills?: Skill[]
+  languages?: Array<{
+    language: string
+    proficiency: 'basic' | 'intermediate' | 'fluent' | 'native'
+  }>
   isActive?: boolean
-  permissions?: Partial<UserPermission>[]
+  jiraEnabled?: boolean
 }
 
 export interface UserResponse {

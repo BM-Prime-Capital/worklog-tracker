@@ -72,7 +72,7 @@ export async function PUT(
         grantedAt: perm.grantedAt || new Date().toISOString(),
         grantedBy: perm.grantedBy || 'system'
       })) : users[userIndex].permissions,
-      updatedAt: new Date().toISOString(),
+      updatedAt: new Date(),
       updatedBy: 'system'
     }
 
@@ -112,7 +112,7 @@ export async function DELETE(
     users[userIndex] = {
       ...users[userIndex],
       isActive: false,
-      updatedAt: new Date().toISOString(),
+      updatedAt: new Date(),
       updatedBy: 'system'
     }
 

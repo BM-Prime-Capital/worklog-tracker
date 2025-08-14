@@ -82,26 +82,29 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new user
-    const newUser = {
+    const newUser: User = {
       id: Date.now().toString(),
       accountId: `mock-account-${Date.now()}`,
       email: body.email,
-      username: body.email.split('@')[0],
       firstName: body.firstName,
       lastName: body.lastName,
       displayName: `${body.firstName} ${body.lastName}`,
+      gender: 'prefer-not-to-say',
       department: body.department,
       employmentType: body.employmentType,
+      employmentStatus: 'active',
       role: body.role || 'Team Member',
       title: body.title || 'Team Member',
+      hireDate: new Date(),
       managerId: body.managerId,
+      workLocation: 'remote',
+      country: 'United States',
+      city: 'New York',
+      timezone: 'America/New_York',
       isActive: true,
-      isAdmin: false,
       permissions: [], // Start with no permissions, can be added later
       accessLevel: 'basic' as const,
       jiraEnabled: false, // Will be enabled after Jira sync
-      otherTools: [],
-      timezone: 'America/New_York', // Default timezone
       workingHours: {
         startTime: '09:00',
         endTime: '17:00',
@@ -109,7 +112,6 @@ export async function POST(request: NextRequest) {
         workDays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as ('monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday')[],
         breakDuration: 60
       },
-      currentProjects: [],
       skills: [],
       certifications: [],
       performanceMetrics: {
@@ -120,17 +122,13 @@ export async function POST(request: NextRequest) {
         innovationScore: 0,
         evaluationPeriod: 'monthly' as 'monthly' | 'quarterly' | 'yearly'
       },
-      worklogStats: {
-        totalHoursLogged: 0,
-        averageDailyHours: 0,
-        mostActiveDay: '',
-        mostActiveProject: '',
-        weeklyAverage: 0,
-        monthlyAverage: 0
-      },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      createdBy: 'system' // In production, this would be the current user's ID
+      languages: [],
+      employeeId: `EMP-${Date.now()}`,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      updatedBy: 'system',
+      createdBy: 'system', // In production, this would be the current user's ID
+      version: 1
     }
 
     users.push(newUser)
@@ -165,7 +163,7 @@ export async function PUT(request: NextRequest) {
           users[userIndex] = {
             ...users[userIndex],
             ...updates,
-            updatedAt: new Date().toISOString(),
+            updatedAt: new Date(),
             updatedBy: 'system'
           }
           results.push({

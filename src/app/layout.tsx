@@ -16,6 +16,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Developer Worklog Dashboard",
   description: "Track developer productivity and work hours from Jira tasks",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({

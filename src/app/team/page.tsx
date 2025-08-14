@@ -27,7 +27,8 @@ import {
   MessageSquare,
   Database,
   Cloud,
-  RefreshCw
+  RefreshCw,
+  Eye
 } from 'lucide-react'
 import DashboardLayout from '@/components/DashboardLayout'
 
@@ -35,15 +36,31 @@ interface TeamMember extends Partial<JiraUser> {
   // Core fields that exist in both Jira and database users
   id: string
   accountId?: string // Jira users have this, database users might not
+  jiraId?: string // Jira user ID for better matching
   email: string
   displayName: string
+  firstName?: string // First name for matching purposes
   
   // Additional fields
   avatar?: string
   team?: string
   role?: string
+  title?: string
   department?: string
-  employmentType?: 'intern' | 'permanent'
+  employmentType?: 'intern' | 'permanent' | 'contractor' | 'consultant'
+  employmentStatus?: 'active' | 'inactive' | 'terminated' | 'resigned' | 'on-leave'
+  hireDate?: Date
+  workLocation?: 'remote' | 'hybrid' | 'office'
+  country?: string
+  city?: string
+  timezone?: string
+  gender?: 'male' | 'female' | 'other' | 'prefer-not-to-say'
+  phoneNumber?: string
+  employeeId?: string
+  probationEndDate?: Date
+  contractEndDate?: Date
+  managerId?: string
+  accessLevel?: 'basic' | 'standard' | 'admin' | 'super-admin'
   lastActivity?: {
     issueKey: string
     summary: string
@@ -55,6 +72,7 @@ interface TeamMember extends Partial<JiraUser> {
   
   // Source tracking
   source: 'jira' | 'database'
+  sourceEnriched?: boolean // Indicates if Jira user was enriched with database data
   isActive?: boolean
   jiraEnabled?: boolean
 }
@@ -68,18 +86,46 @@ export default function TeamPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [activityFilter, setActivityFilter] = useState<'all' | 'recent' | 'active' | 'inactive'>('all')
   const [teamFilter, setTeamFilter] = useState('all')
-  const [sourceFilter, setSourceFilter] = useState<'all' | 'jira' | 'database'>('all')
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'jira' | 'enriched' | 'database'>('all')
   const [sortBy, setSortBy] = useState<'name' | 'email' | 'lastActivity'>('name')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set())
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [editModalMode, setEditModalMode] = useState<'view' | 'edit'>('view')
+  const [selectedUser, setSelectedUser] = useState<TeamMember | null>(null)
   const [newMemberForm, setNewMemberForm] = useState({
     firstName: '',
     lastName: '',
     email: '',
     department: '',
     employmentType: ''
+  })
+  const [editMemberForm, setEditMemberForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    department: '',
+    employmentType: '',
+    title: '',
+    employmentStatus: 'active',
+    hireDate: '',
+    workLocation: 'remote',
+    country: '',
+    city: '',
+    timezone: '',
+    gender: 'prefer-not-to-say',
+    phoneNumber: '',
+    employeeId: '',
+    jiraId: '',
+    accountId: '',
+    probationEndDate: '',
+    contractEndDate: '',
+    managerId: '',
+    accessLevel: 'basic',
+    isActive: true,
+    jiraEnabled: false
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null)
@@ -124,11 +170,13 @@ export default function TeamPage() {
         const transformedJiraMembers: TeamMember[] = jiraUsers.map(user => ({
           id: user.accountId || `jira-${user.displayName}`,
           accountId: user.accountId,
+          jiraId: user.accountId, // Use Jira ID for matching
           email: user.emailAddress,
           displayName: user.displayName,
+          firstName: user.displayName.split(' ')[0], // Extract first name for matching
           avatar: getInitials(user.displayName),
-          team: detectTeam(user.displayName),
-          role: detectRole(user.displayName),
+          team: undefined, // Will be set from database if matched
+          role: undefined, // Will be set from database if matched
           lastActivity: undefined, // Will be populated with real data
           isFavorite: false,
           source: 'jira' as const,
@@ -140,13 +188,15 @@ export default function TeamPage() {
           ? databaseUsers.users.map(dbUser => ({
               id: dbUser.id,
               accountId: dbUser.accountId,
+              jiraId: dbUser.jiraId, // Use Jira ID for matching
               email: dbUser.email,
               displayName: dbUser.displayName,
+              firstName: dbUser.firstName, // Use actual first name from database
               avatar: getInitials(dbUser.displayName),
-              team: dbUser.department ? detectTeam(dbUser.department) : detectTeam(dbUser.displayName),
-              role: dbUser.role || detectRole(dbUser.displayName),
+              team: dbUser.department ? detectTeam(dbUser.department) : undefined,
+              role: dbUser.role || undefined,
               department: dbUser.department,
-              employmentType: dbUser.employmentType,
+              employmentType: (dbUser.employmentType as 'intern' | 'permanent') || 'permanent',
               lastActivity: undefined, // Will be populated with real data
               isFavorite: false,
               source: 'database' as const,
@@ -155,27 +205,55 @@ export default function TeamPage() {
             }))
           : []
 
-        // Merge users, prioritizing database users for duplicates
+        // Merge users, comparing by Jira ID for better accuracy
         const mergedMembers = [...transformedJiraMembers]
         
         transformedDatabaseMembers.forEach(dbMember => {
-          const existingIndex = mergedMembers.findIndex(jiraMember => 
-            jiraMember.email === dbMember.email || 
-            jiraMember.accountId === dbMember.accountId
-          )
+          const existingIndex = mergedMembers.findIndex(jiraMember => {
+            // Try Jira ID first, then fall back to firstName if no Jira ID
+            if (dbMember.jiraId && jiraMember.jiraId) {
+              return dbMember.jiraId === jiraMember.jiraId
+            }
+            // Fallback to firstName matching
+            const jiraFirstName = jiraMember.firstName
+            const dbFirstName = dbMember.firstName
+            return jiraFirstName && dbFirstName && 
+              jiraFirstName.toLowerCase() === dbFirstName.toLowerCase()
+          })
           
           if (existingIndex !== -1) {
-            // Update existing Jira member with database info
+            // Enrich existing Jira member with database info based on Jira ID match
             mergedMembers[existingIndex] = {
               ...mergedMembers[existingIndex],
-              ...dbMember,
-              source: 'database' as const,
-              // Keep Jira-specific fields if they exist
-              accountId: dbMember.accountId || mergedMembers[existingIndex].accountId
+              // Use database values for matched users
+              email: dbMember.email,
+              team: dbMember.team || detectTeam(dbMember.department || ''),
+              role: dbMember.role || 'Developer',
+              department: dbMember.department,
+              employmentType: dbMember.employmentType,
+              isActive: dbMember.isActive,
+              jiraEnabled: dbMember.jiraEnabled,
+              // Keep Jira source but mark as enriched
+              source: 'jira' as const,
+              sourceEnriched: true
             }
           } else {
-            // Add new database member
-            mergedMembers.push(dbMember)
+            // Add new database member (users not in Jira)
+            mergedMembers.push({
+              ...dbMember,
+              source: 'database' as const,
+              sourceEnriched: false
+            })
+          }
+        })
+
+        // For Jira users without matches, use default values instead of random
+        mergedMembers.forEach(member => {
+          if (member.source === 'jira' && !member.sourceEnriched) {
+            // Use sensible defaults for unmatched Jira users
+            member.team = member.team || 'Software Engineering'
+            member.role = member.role || 'Developer'
+            member.employmentType = member.employmentType || 'permanent'
           }
         })
 
@@ -229,7 +307,10 @@ export default function TeamPage() {
       const matchesSearch = member.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            member.email.toLowerCase().includes(searchTerm.toLowerCase())
       const matchesTeam = teamFilter === 'all' || member.team === teamFilter
-      const matchesSource = sourceFilter === 'all' || member.source === sourceFilter
+      const matchesSource = sourceFilter === 'all' || 
+        (sourceFilter === 'jira' && member.source === 'jira') ||
+        (sourceFilter === 'enriched' && member.source === 'jira' && member.sourceEnriched) ||
+        (sourceFilter === 'database' && member.source === 'database')
       
       // Activity filter
       let matchesActivity = true
@@ -394,6 +475,87 @@ export default function TeamPage() {
     setIsSubmitting(false)
   }
 
+  const openEditModal = (user: TeamMember, mode: 'view' | 'edit' = 'view') => {
+    setSelectedUser(user)
+    setEditModalMode(mode)
+    
+    // Extract first and last name from displayName
+    const nameParts = user.displayName.split(' ')
+    const firstName = nameParts[0] || ''
+    const lastName = nameParts.slice(1).join(' ') || ''
+    
+    setEditMemberForm({
+      firstName,
+      lastName,
+      email: user.email,
+      department: user.department || '',
+      employmentType: user.employmentType || 'permanent',
+      title: user.title || '',
+      employmentStatus: user.employmentStatus || 'active',
+      hireDate: user.hireDate ? new Date(user.hireDate).toISOString().split('T')[0] : '',
+      workLocation: user.workLocation || 'remote',
+      country: user.country || '',
+      city: user.city || '',
+      timezone: user.timezone || '',
+      gender: user.gender || 'prefer-not-to-say',
+      phoneNumber: user.phoneNumber || '',
+      employeeId: user.employeeId || '',
+      jiraId: user.jiraId || '',
+      accountId: user.accountId || '',
+      probationEndDate: user.probationEndDate ? new Date(user.probationEndDate).toISOString().split('T')[0] : '',
+      contractEndDate: user.contractEndDate ? new Date(user.contractEndDate).toISOString().split('T')[0] : '',
+      managerId: user.managerId || '',
+      accessLevel: user.accessLevel || 'basic',
+      isActive: user.isActive !== undefined ? user.isActive : true,
+      jiraEnabled: user.jiraEnabled !== undefined ? user.jiraEnabled : false
+    })
+    
+    setIsEditModalOpen(true)
+  }
+
+  const closeEditModal = () => {
+    setIsEditModalOpen(false)
+    setSelectedUser(null)
+    setEditModalMode('view')
+    setEditMemberForm({
+      firstName: '',
+      lastName: '',
+      email: '',
+      department: '',
+      employmentType: '',
+      title: '',
+      employmentStatus: 'active',
+      hireDate: '',
+      workLocation: 'remote',
+      country: '',
+      city: '',
+      timezone: '',
+      gender: 'prefer-not-to-say',
+      phoneNumber: '',
+      employeeId: '',
+      jiraId: '',
+      accountId: '',
+      probationEndDate: '',
+      contractEndDate: '',
+      managerId: '',
+      accessLevel: 'basic',
+      isActive: true,
+      jiraEnabled: false
+    })
+    setIsSubmitting(false)
+  }
+
+  const switchToEditMode = () => {
+    setEditModalMode('edit')
+  }
+
+  const handleEditFormChange = (field: keyof typeof editMemberForm, value: string | boolean) => {
+    setEditMemberForm(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
   const handleFormChange = (field: 'firstName' | 'lastName' | 'email' | 'department' | 'employmentType', value: string) => {
     setNewMemberForm(prev => ({
       ...prev,
@@ -442,6 +604,49 @@ export default function TeamPage() {
     }
   }
 
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+    
+    try {
+      if (!selectedUser) return
+      
+      // Update user using the user service
+      const userData = {
+        firstName: editMemberForm.firstName,
+        lastName: editMemberForm.lastName,
+        email: editMemberForm.email,
+        department: editMemberForm.department as 'software-engineering' | 'venture-capital' | 'graphic-design' | 'communication',
+        employmentType: editMemberForm.employmentType as 'permanent' | 'intern'
+      }
+      
+      const response = await fetch(`/api/users/${selectedUser.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        // Refresh the team members list
+        window.location.reload()
+      } else {
+        console.error('Failed to update user:', result.message)
+        // TODO: Show error message to user
+      }
+      
+      closeEditModal()
+    } catch (error) {
+      console.error('Error updating member:', error)
+      // TODO: Show error message to user
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
@@ -456,7 +661,7 @@ export default function TeamPage() {
   return (
     <DashboardLayout
       title="Team Management"
-      subtitle="Manage and view Atlassian account team members from Jira"
+      subtitle="Manage and view team members from Jira, enriched with database information"
       actions={
         <div className="flex items-center space-x-3">
           <button 
@@ -523,12 +728,13 @@ export default function TeamPage() {
               {/* Source Filter */}
               <select
                 value={sourceFilter}
-                onChange={(e) => setSourceFilter(e.target.value as 'all' | 'jira' | 'database')}
+                onChange={(e) => setSourceFilter(e.target.value as 'all' | 'jira' | 'enriched' | 'database')}
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               >
                 <option value="all">All Sources</option>
-                <option value="jira">Jira</option>
-                <option value="database">Database</option>
+                <option value="jira">Jira Users</option>
+                <option value="enriched">Enriched Users</option>
+                <option value="database">Database Only</option>
               </select>
 
               {/* Sort */}
@@ -660,11 +866,11 @@ export default function TeamPage() {
               </div>
               <div className="bg-white rounded-xl shadow-sm border border-gray-100/50 p-6">
                 <div className="flex items-center">
-                  <div className="p-2 bg-orange-100 rounded-lg">
-                    <Cloud className="w-6 h-6 text-orange-600" />
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <Cloud className="w-6 h-6 text-green-600" />
                   </div>
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">From Jira</p>
+                    <p className="text-sm font-medium text-gray-600">Jira Users</p>
                     <p className="text-2xl font-bold text-gray-900">
                       {filteredMembers.filter(m => m.source === 'jira').length}
                     </p>
@@ -677,7 +883,7 @@ export default function TeamPage() {
                     <Database className="w-6 h-6 text-purple-600" />
                   </div>
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">From Database</p>
+                    <p className="text-sm font-medium text-gray-600">Database Only</p>
                     <p className="text-2xl font-bold text-gray-900">
                       {filteredMembers.filter(m => m.source === 'database').length}
                     </p>
@@ -686,8 +892,8 @@ export default function TeamPage() {
               </div>
               <div className="bg-white rounded-xl shadow-sm border border-gray-100/50 p-6">
                 <div className="flex items-center">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <Activity className="w-6 h-6 text-green-600" />
+                  <div className="p-2 bg-orange-100 rounded-lg">
+                    <Activity className="w-6 h-6 text-orange-600" />
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Recently Active</p>
@@ -720,11 +926,11 @@ export default function TeamPage() {
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center space-x-3">
                         <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-lg">
-                          {member.avatar}
+                            {member.avatar}
                         </div>
                         <div>
                           <h3 className="font-semibold text-gray-900">{member.displayName}</h3>
-                          <p className="text-sm text-gray-600">{member.role}</p>
+                          {/* <p className="text-sm text-gray-600">{member.role}</p> */}
                           <div className="flex items-center space-x-2 mt-1">
                             <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                               member.employmentType === 'permanent' 
@@ -733,36 +939,26 @@ export default function TeamPage() {
                             }`}>
                               {member.employmentType === 'permanent' ? 'Permanent' : 'Intern'}
                             </span>
-                            <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${
-                              member.source === 'jira' 
-                                ? 'bg-orange-100 text-orange-800 border border-orange-200' 
-                                : 'bg-purple-100 text-purple-800 border border-purple-200'
-                            }`}>
-                              {member.source === 'jira' ? (
-                                <>
-                                  <Cloud className="w-3 h-3 mr-1" />
-                                  Jira
-                                </>
-                              ) : (
-                                <>
-                                  <Database className="w-3 h-3 mr-1" />
-                                  Database
-                                </>
-                              )}
-                            </span>
                           </div>
                         </div>
                       </div>
-                      {/*<button*/}
-                      {/*  onClick={() => toggleFavorite(member.accountId)}*/}
-                      {/*  className="text-gray-400 hover:text-yellow-500 transition-colors"*/}
-                      {/*>*/}
-                      {/*  {member.isFavorite ? (*/}
-                      {/*    <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />*/}
-                      {/*  ) : (*/}
-                      {/*    <StarOff className="w-5 h-5" />*/}
-                      {/*  )}*/}
-                      {/*</button>*/}
+                      {/* Three dots menu for database users */}
+                      {member.source === 'database' && (
+                        <div className="relative">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              // Show context menu
+                              const rect = e.currentTarget.getBoundingClientRect()
+                              // For now, just open view mode - you can enhance this with a proper context menu
+                              openEditModal(member, 'view')
+                            }}
+                            className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded hover:bg-gray-100"
+                          >
+                            <MoreVertical className="w-5 h-5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-3">
@@ -770,13 +966,15 @@ export default function TeamPage() {
                         <Mail className="w-4 h-4" />
                         <span className="truncate">{member.email}</span>
                       </div>
-                      <div className="flex items-center space-x-2 text-sm text-gray-600">
-                        <Building className="w-4 h-4" />
-                        <span>{member.team}</span>
-                      </div>
+                      {member.department && (
+                        <div className="flex items-center space-x-2 text-sm text-gray-600">
+                          <Building className="w-4 h-4" />
+                          <span>{member.department}</span>
+                        </div>
+                      )}
                       <div className="flex items-center space-x-2 text-sm text-gray-600">
                         <Users className="w-4 h-4" />
-                        <span>{member.role}</span>
+                        <span>{member.employmentType === 'permanent' ? 'Permanent' : 'Intern'}</span>
                       </div>
                       <div className="flex items-center space-x-2 text-sm text-gray-600">
                         <Globe className="w-4 h-4" />
@@ -834,7 +1032,7 @@ export default function TeamPage() {
                           Employment Type
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Source
+                          Department
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Last Activity
@@ -870,17 +1068,7 @@ export default function TeamPage() {
                             {member.employmentType}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {member.source === 'jira' ? (
-                              <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-800 border border-orange-200">
-                                <Cloud className="w-3 h-3 mr-1" />
-                                Jira
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800 border border-purple-200">
-                                <Database className="w-3 h-3 mr-1" />
-                                Database
-                              </span>
-                            )}
+                            {member.department}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             {member.lastActivity ? (
@@ -904,12 +1092,33 @@ export default function TeamPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex items-center space-x-2">
-                              <button className="text-blue-600 hover:text-blue-900">
-                                <Mail className="w-4 h-4" />
-                              </button>
-                              <button className="text-gray-600 hover:text-gray-900">
-                                <MoreVertical className="w-4 h-4" />
-                              </button>
+                              {member.source === 'database' ? (
+                                <>
+                                  <button 
+                                    onClick={() => openEditModal(member, 'view')}
+                                    className="text-blue-600 hover:text-blue-900"
+                                    title="View Details"
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </button>
+                                  <button 
+                                    onClick={() => openEditModal(member, 'edit')}
+                                    className="text-green-600 hover:text-green-900"
+                                    title="Edit User"
+                                  >
+                                    <Edit3 className="w-4 h-4" />
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button className="text-blue-600 hover:text-blue-900">
+                                    <Mail className="w-4 h-4" />
+                                  </button>
+                                  <button className="text-gray-600 hover:text-gray-900">
+                                    <MoreVertical className="w-4 h-4" />
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1076,6 +1285,490 @@ export default function TeamPage() {
                   'Add Member'
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Member Modal */}
+      {isEditModalOpen && selectedUser && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+            {/* Modal Header - Fixed */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
+              <div className="flex items-center space-x-3">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">
+                    {editModalMode === 'view' ? 'User Details' : 'Edit User'}
+                  </h2>
+                  <p className="text-sm text-gray-600">
+                    {editModalMode === 'view' ? 'View user information' : 'Update user details'}
+                  </p>
+                </div>
+                {editModalMode === 'view' && (
+                  <button
+                    onClick={switchToEditMode}
+                    className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Edit User"
+                  >
+                    <Edit3 className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={closeEditModal}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Content - Scrollable */}
+            <div className="p-6 flex-1 overflow-y-auto">
+              {editModalMode === 'view' ? (
+                // View Mode - Read-only display
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Personal Information */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Personal Information</h3>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                      <p className="text-gray-900">{selectedUser.displayName}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                      <p className="text-gray-900">{selectedUser.email}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                      <p className="text-gray-900 capitalize">{selectedUser.gender || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                      <p className="text-gray-900">{selectedUser.phoneNumber || 'Not specified'}</p>
+                    </div>
+                  </div>
+
+                  {/* Professional Information */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Professional Information</h3>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                      <p className="text-gray-900">{selectedUser.department || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                      <p className="text-gray-900">{selectedUser.role || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                      <p className="text-gray-900">{selectedUser.title || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Employment Type</label>
+                      <p className="text-gray-900 capitalize">{selectedUser.employmentType || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Employment Status</label>
+                      <p className="text-gray-900 capitalize">{selectedUser.employmentStatus || 'Not specified'}</p>
+                    </div>
+                  </div>
+
+                  {/* Location & Work */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Location & Work</h3>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Work Location</label>
+                      <p className="text-gray-900 capitalize">{selectedUser.workLocation || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                      <p className="text-gray-900">{selectedUser.country || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                      <p className="text-gray-900">{selectedUser.city || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
+                      <p className="text-gray-900">{selectedUser.timezone || 'Not specified'}</p>
+                    </div>
+                  </div>
+
+                  {/* System & Integration */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">System & Integration</h3>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Employee ID</label>
+                      <p className="text-gray-900">{selectedUser.employeeId || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Jira ID</label>
+                      <p className="text-gray-900">{selectedUser.jiraId || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Source</label>
+                      <p className="text-gray-900 capitalize">{selectedUser.source}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Active Status</label>
+                      <p className="text-gray-900">{selectedUser.isActive ? 'Active' : 'Inactive'}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                // Edit Mode - Editable form with comprehensive fields
+                <form onSubmit={handleEditSubmit} className="space-y-8">
+                  {/* Personal Information Section */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 border-b pb-2 mb-4">Personal Information</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="editFirstName" className="block text-sm font-medium text-gray-700 mb-2">
+                          First Name *
+                        </label>
+                        <input
+                          type="text"
+                          id="editFirstName"
+                          required
+                          value={editMemberForm.firstName}
+                          onChange={(e) => handleEditFormChange('firstName', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter first name"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="editLastName" className="block text-sm font-medium text-gray-700 mb-2">
+                          Last Name *
+                        </label>
+                        <input
+                          type="text"
+                          id="editLastName"
+                          required
+                          value={editMemberForm.lastName}
+                          onChange={(e) => handleEditFormChange('lastName', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter last name"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="editEmail" className="block text-sm font-medium text-gray-700 mb-2">
+                          Email *
+                        </label>
+                        <input
+                          type="email"
+                          id="editEmail"
+                          required
+                          value={editMemberForm.email}
+                          onChange={(e) => handleEditFormChange('email', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter email address"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="editGender" className="block text-sm font-medium text-gray-700 mb-2">
+                          Gender
+                        </label>
+                        <select
+                          id="editGender"
+                          value={editMemberForm.gender}
+                          onChange={(e) => handleEditFormChange('gender', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="prefer-not-to-say">Prefer not to say</option>
+                          <option value="male">Male</option>
+                          <option value="female">Female</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor="editPhoneNumber" className="block text-sm font-medium text-gray-700 mb-2">
+                          Phone Number
+                        </label>
+                        <input
+                          type="tel"
+                          id="editPhoneNumber"
+                          value={editMemberForm.phoneNumber}
+                          onChange={(e) => handleEditFormChange('phoneNumber', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter phone number"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="editEmployeeId" className="block text-sm font-medium text-gray-700 mb-2">
+                          Employee ID *
+                        </label>
+                        <input
+                          type="text"
+                          id="editEmployeeId"
+                          required
+                          value={editMemberForm.employeeId}
+                          onChange={(e) => handleEditFormChange('employeeId', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter employee ID"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Professional Information Section */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 border-b pb-2 mb-4">Professional Information</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="editTitle" className="block text-sm font-medium text-gray-700 mb-2">
+                          Job Title *
+                        </label>
+                        <input
+                          type="text"
+                          id="editTitle"
+                          required
+                          value={editMemberForm.title}
+                          onChange={(e) => handleEditFormChange('title', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter job title"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="editDepartment" className="block text-sm font-medium text-gray-700 mb-2">
+                          Department *
+                        </label>
+                        <select
+                          id="editDepartment"
+                          required
+                          value={editMemberForm.department}
+                          onChange={(e) => handleEditFormChange('department', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="">Select a department</option>
+                          <option value="software-engineering">Software Engineering</option>
+                          <option value="venture-capital">Venture Capital</option>
+                          <option value="graphic-design">Graphic Design</option>
+                          <option value="communication">Communication</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor="editEmploymentType" className="block text-sm font-medium text-gray-700 mb-2">
+                          Employment Type *
+                        </label>
+                        <select
+                          id="editEmploymentType"
+                          required
+                          value={editMemberForm.employmentType}
+                          onChange={(e) => handleEditFormChange('employmentType', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="">Select employment type</option>
+                          <option value="permanent">Permanent</option>
+                          <option value="intern">Intern</option>
+                          <option value="contractor">Contractor</option>
+                          <option value="consultant">Consultant</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor="editEmploymentStatus" className="block text-sm font-medium text-gray-700 mb-2">
+                          Employment Status *
+                        </label>
+                        <select
+                          id="editEmploymentStatus"
+                          required
+                          value={editMemberForm.employmentStatus}
+                          onChange={(e) => handleEditFormChange('employmentStatus', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
+                          <option value="terminated">Terminated</option>
+                          <option value="resigned">Resigned</option>
+                          <option value="on-leave">On Leave</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor="editHireDate" className="block text-sm font-medium text-gray-700 mb-2">
+                          Hire Date *
+                        </label>
+                        <input
+                          type="date"
+                          id="editHireDate"
+                          required
+                          value={editMemberForm.hireDate}
+                          onChange={(e) => handleEditFormChange('hireDate', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="editWorkLocation" className="block text-sm font-medium text-gray-700 mb-2">
+                          Work Location *
+                        </label>
+                        <select
+                          id="editWorkLocation"
+                          required
+                          value={editMemberForm.workLocation}
+                          onChange={(e) => handleEditFormChange('workLocation', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="remote">Remote</option>
+                          <option value="hybrid">Hybrid</option>
+                          <option value="office">Office</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Location & Timezone Section */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 border-b pb-2 mb-4">Location & Timezone</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="editCountry" className="block text-sm font-medium text-gray-700 mb-2">
+                          Country *
+                        </label>
+                        <input
+                          type="text"
+                          id="editCountry"
+                          required
+                          value={editMemberForm.country}
+                          onChange={(e) => handleEditFormChange('country', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter country"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="editCity" className="block text-sm font-medium text-gray-700 mb-2">
+                          City *
+                        </label>
+                        <input
+                          type="text"
+                          id="editCity"
+                          required
+                          value={editMemberForm.city}
+                          onChange={(e) => handleEditFormChange('city', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter city"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="editTimezone" className="block text-sm font-medium text-gray-700 mb-2">
+                          Timezone *
+                        </label>
+                        <input
+                          type="text"
+                          id="editTimezone"
+                          required
+                          value={editMemberForm.timezone}
+                          onChange={(e) => handleEditFormChange('timezone', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="e.g., UTC-5, Europe/London"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Integration & System Section */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 border-b pb-2 mb-4">Integration & System</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="editJiraId" className="block text-sm font-medium text-gray-700 mb-2">
+                          Jira ID
+                        </label>
+                        <input
+                          type="text"
+                          id="editJiraId"
+                          value={editMemberForm.jiraId}
+                          onChange={(e) => handleEditFormChange('jiraId', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter Jira user ID"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="editAccountId" className="block text-sm font-medium text-gray-700 mb-2">
+                          Account ID
+                        </label>
+                        <input
+                          type="text"
+                          id="editAccountId"
+                          value={editMemberForm.accountId}
+                          onChange={(e) => handleEditFormChange('accountId', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter account ID"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="editAccessLevel" className="block text-sm font-medium text-gray-700 mb-2">
+                          Access Level
+                        </label>
+                        <select
+                          id="editAccessLevel"
+                          value={editMemberForm.accessLevel}
+                          onChange={(e) => handleEditFormChange('accessLevel', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="basic">Basic</option>
+                          <option value="standard">Standard</option>
+                          <option value="admin">Admin</option>
+                          <option value="super-admin">Super Admin</option>
+                        </select>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="editIsActive"
+                          checked={editMemberForm.isActive}
+                          onChange={(e) => handleEditFormChange('isActive', e.target.checked)}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <label htmlFor="editIsActive" className="text-sm font-medium text-gray-700">
+                          User is Active
+                        </label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="editJiraEnabled"
+                          checked={editMemberForm.jiraEnabled}
+                          onChange={(e) => handleEditFormChange('jiraEnabled', e.target.checked)}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <label htmlFor="editJiraEnabled" className="text-sm font-medium text-gray-700">
+                          Jira Integration Enabled
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              )}
+            </div>
+
+            {/* Modal Footer - Fixed */}
+            <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200 flex-shrink-0">
+              <button
+                type="button"
+                onClick={closeEditModal}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                disabled={isSubmitting}
+              >
+                {editModalMode === 'view' ? 'Close' : 'Cancel'}
+              </button>
+              {editModalMode === 'edit' && (
+                <button
+                  type="submit"
+                  onClick={handleEditSubmit}
+                  disabled={isSubmitting || !editMemberForm.firstName || !editMemberForm.lastName || !editMemberForm.email || !editMemberForm.department || !editMemberForm.employmentType || !editMemberForm.title || !editMemberForm.employmentStatus || !editMemberForm.hireDate || !editMemberForm.workLocation || !editMemberForm.country || !editMemberForm.city || !editMemberForm.timezone || !editMemberForm.employeeId}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Updating...
+                    </>
+                  ) : (
+                    'Update User'
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>

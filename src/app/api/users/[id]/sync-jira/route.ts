@@ -43,8 +43,7 @@ export async function POST(
       ...user,
       accountId: jiraData.accountId,
       jiraEnabled: true,
-      jiraLastSync: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      updatedAt: new Date(),
       updatedBy: 'jira-sync'
     }
 

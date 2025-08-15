@@ -939,13 +939,13 @@ export default function TeamPage() {
                             }`}>
                               {member.employmentType === 'permanent' ? 'Permanent' : 'Intern'}
                             </span>
-                          </div>
                         </div>
+                      </div>
                       </div>
                       {/* Three dots menu for database users */}
                       {member.source === 'database' && (
                         <div className="relative">
-                          <button
+                      <button
                             onClick={(e) => {
                               e.stopPropagation()
                               // Show context menu
@@ -956,7 +956,7 @@ export default function TeamPage() {
                             className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded hover:bg-gray-100"
                           >
                             <MoreVertical className="w-5 h-5" />
-                          </button>
+                      </button>
                         </div>
                       )}
                     </div>
@@ -967,10 +967,10 @@ export default function TeamPage() {
                         <span className="truncate">{member.email}</span>
                       </div>
                       {member.department && (
-                        <div className="flex items-center space-x-2 text-sm text-gray-600">
-                          <Building className="w-4 h-4" />
+                      <div className="flex items-center space-x-2 text-sm text-gray-600">
+                        <Building className="w-4 h-4" />
                           <span>{member.department}</span>
-                        </div>
+                      </div>
                       )}
                       <div className="flex items-center space-x-2 text-sm text-gray-600">
                         <Users className="w-4 h-4" />
@@ -986,12 +986,12 @@ export default function TeamPage() {
                     <div className="mt-4 pt-4 border-t border-gray-100">
                       {member.lastActivity ? (
                         <div className="space-y-2">
-                          <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between">
                             <span className="text-xs font-medium text-gray-500">Last Activity</span>
                             <span className={`text-xs font-medium ${getActivityColor(member.lastActivity.timestamp)}`}>
                               {member.lastActivity.timeAgo}
-                            </span>
-                          </div>
+                        </span>
+                      </div>
                           <div className="bg-gray-50 rounded-lg p-3">
                             <div className="flex items-center space-x-2 mb-1">
                               <Edit3 className="w-3 h-3 text-blue-500" />
@@ -1047,8 +1047,8 @@ export default function TeamPage() {
                         <tr key={member.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
-                              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
-                                {member.avatar}
+                                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
+                                  {member.avatar}
                               </div>
                               <div className="ml-4">
                                 <div className="text-sm font-medium text-gray-900">{member.displayName}</div>
@@ -1111,12 +1111,12 @@ export default function TeamPage() {
                                 </>
                               ) : (
                                 <>
-                                  <button className="text-blue-600 hover:text-blue-900">
-                                    <Mail className="w-4 h-4" />
-                                  </button>
-                                  <button className="text-gray-600 hover:text-gray-900">
-                                    <MoreVertical className="w-4 h-4" />
-                                  </button>
+                              <button className="text-blue-600 hover:text-blue-900">
+                                <Mail className="w-4 h-4" />
+                              </button>
+                              <button className="text-gray-600 hover:text-gray-900">
+                                <MoreVertical className="w-4 h-4" />
+                              </button>
                                 </>
                               )}
                             </div>

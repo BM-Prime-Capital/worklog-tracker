@@ -36,10 +36,10 @@ export async function POST(request: NextRequest) {
         })
 
         const worklogs = extractWorklogs(response.data.issues, startDate, endDate)
-        console.log('Jira API get-worklogs response - issues count:', response.data.issues?.length)
-        console.log('Jira API get-worklogs response - first issue fields:', response.data.issues?.[0]?.fields)
-        console.log('Jira API get-worklogs response - extracted worklogs count:', worklogs.length)
-        console.log('Jira API get-worklogs response - first worklog:', worklogs[0])
+        // console.log('Jira API get-worklogs response - issues count:', response.data.issues?.length)
+        // console.log('Jira API get-worklogs response - first issue fields:', response.data.issues?.[0]?.fields)
+        // console.log('Jira API get-worklogs response - extracted worklogs count:', worklogs.length)
+        // console.log('Jira API get-worklogs response - first worklog:', worklogs[0])
         return NextResponse.json({ worklogs })
 
       case 'get-users':
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
             maxResults: maxResults || 50
           }
         })
-        console.log('Jira API get-issues response:', response.data)
+        // console.log('Jira API get-issues response:', response.data)
         return NextResponse.json({ issues: response.data.issues })
 
       case 'get-recent-issues':
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
             maxResults: recentMaxResults || 50
           }
         })
-        console.log('Jira API get-recent-issues response:', response.data)
+        // console.log('Jira API get-recent-issues response:', response.data)
         return NextResponse.json({ issues: response.data.issues })
 
       case 'get-project-issue-count':
@@ -247,11 +247,11 @@ function extractWorklogs(issues: unknown[], startDate: string, endDate: string) 
                   commentText = extractTextFromContent(content)
                   const commentAttachments = extractAttachmentsFromContent(content)
                   attachments = [...attachments, ...commentAttachments]
-                  console.log('Extracted text from content:', commentText)
-                  console.log('Extracted attachments from comment:', commentAttachments)
+                  // console.log('Extracted text from content:', commentText)
+                  // console.log('Extracted attachments from comment:', commentAttachments)
                 } else if ('text' in worklog.comment && typeof (worklog.comment as { text: string }).text === 'string') {
                   commentText = (worklog.comment as { text: string }).text
-                  console.log('Direct text extracted:', commentText)
+                  // console.log('Direct text extracted:', commentText)
                 }
               }
             } else {
@@ -308,7 +308,7 @@ function extractTextFromContent(content: unknown[]): string {
 
 function extractAttachmentsFromContent(content: unknown[]): unknown[] {
   const attachments: unknown[] = []
-  console.log('Extracting attachments from content:', content)
+  // console.log('Extracting attachments from content:', content)
 
   function extractFromNode(node: unknown): void {
     if (typeof node === 'object' && node !== null) {
@@ -318,7 +318,7 @@ function extractAttachmentsFromContent(content: unknown[]): unknown[] {
         if (typeof attrs === 'object' && attrs !== null) {
           // Check for file attachment
           if ('file' in attrs && typeof (attrs as { file: unknown }).file === 'object' && (attrs as { file: unknown }).file !== null) {
-            console.log('Found file attachment:', (attrs as { file: unknown }).file)
+            // console.log('Found file attachment:', (attrs as { file: unknown }).file)
             attachments.push({
               type: 'jira-file',
               data: (attrs as { file: unknown }).file
@@ -327,7 +327,7 @@ function extractAttachmentsFromContent(content: unknown[]): unknown[] {
           
           // Check for media attachment
           if ('media' in attrs && typeof (attrs as { media: unknown }).media === 'object' && (attrs as { media: unknown }).media !== null) {
-            console.log('Found media attachment:', (attrs as { media: unknown }).media)
+            // console.log('Found media attachment:', (attrs as { media: unknown }).media)
             attachments.push({
               type: 'jira-media',
               data: (attrs as { media: unknown }).media

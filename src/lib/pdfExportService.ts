@@ -14,7 +14,7 @@ declare module 'jspdf' {
 }
 
 // Apply the autotable plugin to jsPDF
-(jsPDF as any).autoTable = autoTable
+(jsPDF.prototype as any).autoTable = autoTable
 
 interface ExportOptions {
   startDate: Date
@@ -67,6 +67,9 @@ export class PDFExportService {
 
       // Add export metadata
       this.addExportMetadata(options.exportTimestamp)
+
+      // Add page numbers to all pages (single, authoritative pass)
+      this.addPageNumbersFooter()
 
       // Convert to blob
       const pdfBlob = this.doc.output('blob')
@@ -236,7 +239,7 @@ export class PDFExportService {
         fontSize: 10,
         textColor: 44
       },
-      margin: { left: this.margin },
+      margin: { left: this.margin, bottom: 20 }, // Reserve bottom space for footer
       tableWidth: this.pageWidth - (this.margin * 2)
     })
     
@@ -280,7 +283,7 @@ export class PDFExportService {
         fontSize: 10,
         textColor: 44
       },
-      margin: { left: this.margin },
+      margin: { left: this.margin, bottom: 20 }, // Reserve bottom space for footer
       tableWidth: this.pageWidth - (this.margin * 2)
     })
     
@@ -375,6 +378,17 @@ export class PDFExportService {
     // Generate table for each day
     worklogsByDay.forEach(({ day, worklogs: dayWorklogs }) => {
       if (dayWorklogs.length > 0) {
+        // Check if we have enough space for the day header + table
+        // We need space for: day header (6mm) + table header + at least one row + some buffer
+        const estimatedTableHeight = 6 + 8 + (dayWorklogs.length * 6) + 20 // day header + table header + rows + buffer
+        const pageHeight = this.doc.internal.pageSize.getHeight()
+        const availableSpace = pageHeight - this.currentY - this.margin
+        
+        // If not enough space, start a new page
+        if (availableSpace < estimatedTableHeight) {
+          this.addPageBreak()
+        }
+        
         this.addDayHeader(day)
         this.addDayWorklogTable(dayWorklogs)
       }
@@ -421,7 +435,7 @@ export class PDFExportService {
         fontSize: 8,
         textColor: 44
       },
-      margin: { left: this.margin },
+      margin: { left: this.margin, bottom: 20 }, // Reserve bottom space for footer
       tableWidth: this.pageWidth - (this.margin * 2),
       columnStyles: {
         0: { cellWidth: 20 }, // Date
@@ -434,6 +448,30 @@ export class PDFExportService {
     })
     
     this.currentY = this.getLastAutoTableFinalY()
+  }
+
+  /**
+   * Add page numbers to all pages (single, authoritative pass)
+   */
+  private addPageNumbersFooter(): void {
+    const total = this.doc.getNumberOfPages()
+    console.log(`Adding page numbers to all ${total} pages`)
+    
+    this.doc.setFontSize(10)
+    this.doc.setFont('helvetica', 'normal')
+    this.doc.setTextColor(149, 165, 166)
+
+    for (let i = 1; i <= total; i++) {
+      this.doc.setPage(i)
+      const pageWidth = this.doc.internal.pageSize.getWidth()
+      const pageHeight = this.doc.internal.pageSize.getHeight()
+      const label = `Page ${i} of ${total}`
+      const textWidth = this.doc.getTextWidth(label)
+      const x = pageWidth - this.margin - textWidth
+      const y = pageHeight - 15 // 15mm up from bottom
+      this.doc.text(label, x, y)
+      console.log(`Added page number to page ${i}`)
+    }
   }
 
   /**
@@ -452,6 +490,7 @@ export class PDFExportService {
    * Add page break
    */
   private addPageBreak(): void {
+    // Add new page (no page numbering here - done at the end)
     this.doc.addPage()
     this.currentY = this.margin
   }

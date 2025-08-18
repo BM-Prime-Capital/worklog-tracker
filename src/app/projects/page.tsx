@@ -160,7 +160,7 @@ export default function ProjectsPage() {
           }
           return false
         }) : []
-        
+
         // Fetch comprehensive stats for each project
         console.log('Fetching project stats...')
         const projectsWithStats = await Promise.all(
@@ -185,7 +185,7 @@ export default function ProjectsPage() {
             }
           })
         )
-        
+
         let validIssues = Array.isArray(issuesData) ? issuesData.filter(issue => {
           if (issue && typeof issue === 'object' && issue !== null) {
             const issueObj = issue as { id?: string; key?: string; fields?: unknown }
@@ -298,6 +298,8 @@ export default function ProjectsPage() {
           bValue = b.name.toLowerCase()
       }
 
+
+
       if (sortOrder === 'asc') {
         return aValue.localeCompare(bValue)
       } else {
@@ -357,7 +359,7 @@ export default function ProjectsPage() {
     const total = project?.totalIssues || 0
     const done = project?.doneIssues || 0
     const progressPercentage = project?.progressPercentage || 0
-    
+
     return { total, done, progressPercentage }
   }
 
@@ -374,30 +376,30 @@ export default function ProjectsPage() {
   const getRecentTasksForProject = (projectKey: string) => {
     console.log('getRecentTasksForProject called with:', projectKey)
     console.log('recentIssues available:', recentIssues.length)
-    
+
     if (recentIssues.length === 0) {
       console.log('No recent issues available')
       return []
     }
-    
+
     // Filter issues by project key - try multiple matching strategies
     const projectIssues = recentIssues.filter(issue => {
       const issueProjectKey = issue?.fields?.project?.key
       const issueKey = issue?.key
-      
+
       // Check if issue key starts with project key (e.g., "PROJ-123" for project "PROJ")
       const keyMatches = issueKey && issueKey.startsWith(projectKey + '-')
       // Check if project key matches exactly
       const projectMatches = issueProjectKey === projectKey
-      
+
       const matches = keyMatches || projectMatches
       console.log(`Issue ${issueKey}: project key=${issueProjectKey}, key starts with ${projectKey}-=${keyMatches}, project matches=${projectMatches}, final match=${matches}`)
-      
+
       return matches
     })
-    
+
     console.log(`Found ${projectIssues.length} issues for project ${projectKey}`)
-    
+
     if (projectIssues.length === 0) {
       // If no issues found by project key, try to find issues that might be related
       console.log('No direct project matches, checking for related issues...')
@@ -408,17 +410,17 @@ export default function ProjectsPage() {
       console.log(`Found ${relatedIssues.length} potentially related issues`)
       return relatedIssues.slice(0, 10)
     }
-    
+
     // Sort by creation date (most recent first) and take first 10
     const sortedIssues = projectIssues.sort((a, b) => {
       const dateA = new Date(a?.fields?.created || 0)
       const dateB = new Date(b?.fields?.created || 0)
       return dateB.getTime() - dateA.getTime() // Most recent first
     })
-    
+
     const result = sortedIssues.slice(0, 10)
     console.log(`Returning ${result.length} most recent issues for project ${projectKey}`)
-    
+
     return result
   }
 
@@ -650,7 +652,7 @@ export default function ProjectsPage() {
                       <span>{stats.progressPercentage}%</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
+                      <div
                         className="bg-green-600 h-2 rounded-full transition-all duration-300"
                         style={{ width: `${stats.progressPercentage}%` }}
                       ></div>
@@ -667,7 +669,7 @@ export default function ProjectsPage() {
 
                   {/* Actions */}
                   <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                    <button 
+                    <button
                       onClick={() => openProjectModal(project)}
                       className="text-blue-600 hover:text-blue-700 text-sm font-medium transition-colors"
                     >
@@ -896,7 +898,7 @@ export default function ProjectsPage() {
                         <span>{selectedProject.progressPercentage || 0}%</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
+                        <div
                           className="bg-green-600 h-2 rounded-full transition-all duration-300"
                           style={{ width: `${selectedProject.progressPercentage || 0}%` }}
                         ></div>
@@ -938,7 +940,7 @@ export default function ProjectsPage() {
                           const firstIssue = recentTasks[0]
                           const issueKey = firstIssue?.key
                           const projectKey = firstIssue?.fields?.project?.key
-                          
+
                           if (projectKey === selectedProject.key) {
                             return `${recentTasks.length} project-specific issues found`
                           } else if (issueKey && issueKey.startsWith(selectedProject.key + '-')) {
@@ -961,7 +963,7 @@ export default function ProjectsPage() {
                 {(() => {
                   const recentTasks = getRecentTasksForProject(selectedProject.key)
                   console.log(`Recent tasks for ${selectedProject.key}:`, recentTasks) // Debug log
-                  
+
                   if (recentTasks.length > 0) {
                     return (
                       <div className="space-y-4">
@@ -1029,10 +1031,10 @@ export default function ProjectsPage() {
                           No recent issues found for project <span className="font-medium">{selectedProject.key}</span>
                         </p>
                         <p className="text-xs text-gray-400 mb-4">
-                          Total issues available: {recentIssues.length} | 
+                          Total issues available: {recentIssues.length} |
                           Project key: {selectedProject.key}
                         </p>
-                        
+
                         {/* Show sample of available issues for debugging */}
                         {recentIssues.length > 0 && (
                           <div className="mt-6 text-left max-w-2xl mx-auto">

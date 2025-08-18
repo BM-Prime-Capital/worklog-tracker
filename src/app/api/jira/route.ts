@@ -231,6 +231,7 @@ function extractWorklogs(issues: unknown[], startDate: string, endDate: string) 
               }
             }
 
+
             if (worklog && typeof worklog === 'object' && 'comment' in worklog && worklog.comment) {
               console.log('Processing worklog comment:', worklog.comment)
               console.log('Comment type:', typeof worklog.comment)
@@ -324,7 +325,7 @@ function extractAttachmentsFromContent(content: unknown[]): unknown[] {
               data: (attrs as { file: unknown }).file
             })
           }
-          
+
           // Check for media attachment
           if ('media' in attrs && typeof (attrs as { media: unknown }).media === 'object' && (attrs as { media: unknown }).media !== null) {
             // console.log('Found media attachment:', (attrs as { media: unknown }).media)

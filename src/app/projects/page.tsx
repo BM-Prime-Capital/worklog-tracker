@@ -328,6 +328,47 @@ export default function ProjectsPage() {
     }
   }
 
+  const translateStatus = (statusCategory: string, statusName?: string): string => {
+    // If status is done, return as is
+    if (statusCategory === 'done') {
+      return 'Done'
+    }
+    
+    // Check status name for Spanish translations
+    if (statusName) {
+      if (statusName === 'En revisión') {
+        return 'In Review'
+      }
+      if (statusName === 'En curso') {
+        return 'In Progress'
+      }
+    }
+    
+    // Fallback to status category
+    switch (statusCategory) {
+      case 'new': return 'To Do'
+      case 'indeterminate': return 'In Progress'
+      default: return 'Unknown'
+    }
+  }
+
+  const getStatusBadgeStyle = (statusText: string, size: 'sm' | 'xs' = 'sm') => {
+    const baseClasses = size === 'sm' ? 'px-3 py-1 text-sm' : 'px-2 py-1 text-xs'
+    
+    switch (statusText) {
+      case 'Done':
+        return `${baseClasses} font-medium bg-green-100 text-green-800 border border-green-200 rounded-full`
+      case 'In Progress':
+        return `${baseClasses} font-medium bg-yellow-100 text-yellow-800 border border-yellow-200 rounded-full`
+      case 'In Review':
+        return `${baseClasses} font-medium bg-purple-100 text-purple-800 border border-purple-200 rounded-full`
+      case 'To Do':
+        return `${baseClasses} font-medium bg-blue-100 text-blue-800 border border-blue-200 rounded-full`
+      default:
+        return `${baseClasses} font-medium bg-gray-100 text-gray-800 border border-gray-200 rounded-full`
+    }
+  }
+
   const getProjectTypeColor = (projectType: string) => {
     switch (projectType) {
       case 'software': return 'bg-blue-100 text-blue-800'
@@ -727,13 +768,8 @@ export default function ProjectsPage() {
                         <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-blue-100 text-blue-800 border border-blue-200">
                           {issue.key}
                         </span>
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                          issue?.fields?.status?.statusCategory?.key === 'done' ? 'bg-green-100 text-green-800 border border-green-200' :
-                          issue?.fields?.status?.statusCategory?.key === 'indeterminate' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
-                          issue?.fields?.status?.statusCategory?.key === 'new' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
-                          'bg-gray-100 text-gray-800 border border-gray-200'
-                        }`}>
-                          {issue?.fields?.status?.statusCategory?.key || 'Unknown'}
+                        <span className={`inline-flex items-center ${getStatusBadgeStyle(translateStatus(issue?.fields?.status?.statusCategory?.key || 'unknown', issue?.fields?.status?.name))}`}>
+                          {translateStatus(issue?.fields?.status?.statusCategory?.key || 'unknown', issue?.fields?.status?.name)}
                         </span>
                       </div>
                       <button className="text-gray-400 hover:text-blue-600 transition-colors">
@@ -975,13 +1011,8 @@ export default function ProjectsPage() {
                                   <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-blue-100 text-blue-800 border border-blue-200">
                                     {task.key}
                                   </span>
-                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                    task?.fields?.status?.statusCategory?.key === 'done' ? 'bg-green-100 text-green-800 border border-green-200' :
-                                    task?.fields?.status?.statusCategory?.key === 'indeterminate' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
-                                    task?.fields?.status?.statusCategory?.key === 'new' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
-                                    'bg-gray-100 text-gray-800 border border-gray-200'
-                                  }`}>
-                                    {task?.fields?.status?.statusCategory?.key || 'Unknown'}
+                                  <span className={`inline-flex items-center ${getStatusBadgeStyle(translateStatus(task?.fields?.status?.statusCategory?.key || 'unknown', task?.fields?.status?.name), 'xs')}`}>
+                                    {translateStatus(task?.fields?.status?.statusCategory?.key || 'unknown', task?.fields?.status?.name)}
                                   </span>
                                   <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">#{index + 1}</span>
                                   {task?.fields?.project?.key && task?.fields?.project?.key !== selectedProject.key && (

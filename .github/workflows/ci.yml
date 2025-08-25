@@ -68,7 +68,7 @@ jobs:
             echo '🏗️ Building Next.js app'
             NODE_ENV=production npm run build
 
-            echo '🚀 Restarting app with PM2'
+            echo '🚀 Restarting app with PM2.'
             sudo npm install -g pm2
             export PATH=$PATH:$(npm root -g)/.bin
             hash -r

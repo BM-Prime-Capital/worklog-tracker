@@ -57,7 +57,7 @@ jobs:
         run: npm run build
 
   deploy-ec2:
-    name: Deploy to EC2 (/var/www/worklog-tracker)
+    name: Deploy to EC2 as root (/var/www/worklog-tracker)
     if: ${{ github.ref == 'refs/heads/main' }}
     needs: [setup-and-build]
     runs-on: ubuntu-latest
@@ -80,21 +80,13 @@ jobs:
             --exclude ".next" \
             --exclude ".env" \
             -e "ssh -o StrictHostKeyChecking=no" \
-            ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/var/www/worklog-tracker
+            ./ root@${{ secrets.EC2_HOST }}:/var/www/worklog-tracker
 
       - name: Install, build & restart on EC2
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.EC2_HOST }} << EOF
             set -e
             cd /var/www/worklog-tracker
-
-            # Charger NVM et Node.js 20
-            if [ -s "$HOME/.nvm/nvm.sh" ]; then
-              export NVM_DIR="$HOME/.nvm"
-              . "$NVM_DIR/nvm.sh"
-              nvm install 20
-              nvm use 20
-            fi
 
             echo "✅ Node version: \$(node -v)"
             echo "✅ NPM version: \$(npm -v)"
@@ -106,7 +98,7 @@ jobs:
               pm2 describe worklog-tracker >/dev/null 2>&1 && pm2 reload worklog-tracker || pm2 start "npm -- start" --name worklog-tracker
               pm2 save
             elif systemctl list-units --type=service | grep -q worklog-tracker.service; then
-              sudo systemctl restart worklog-tracker
+              systemctl restart worklog-tracker
             else
               nohup npm start >/tmp/worklog-tracker.log 2>&1 &
             fi

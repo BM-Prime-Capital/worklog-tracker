@@ -76,7 +76,7 @@ jobs:
             fi
             
             pm2 delete worklog-tracker || true
-            PORT=3000 pm2 start npm --name worklog-tracker -- start
+            PORT=3002 pm2 start npm --name worklog-tracker -- start
             pm2 save
             pm2 startup
           EOF

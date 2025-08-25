@@ -44,35 +44,28 @@ jobs:
             echo '✅ Marking as safe Git directory'
             git config --global --add safe.directory "$APP_PATH"
 
-            # Load NVM explicitly with full path
-            export NVM_DIR="/root/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-            
-            # Use specific Node.js version
-            nvm use 20.19.4
+            # Define absolute paths to Node.js and npm
+            NODE_BIN="/root/.nvm/versions/node/v20.19.4/bin/node"
+            NPM_BIN="/root/.nvm/versions/node/v20.19.4/bin/npm"
 
-            echo "✅ Node version: $(node -v)"
-            echo "✅ NPM version: $(npm -v)"
+            echo "✅ Node version: $($NODE_BIN -v)"
+            echo "✅ NPM version: $($NPM_BIN -v)"
 
             echo '⚙️ Reinstalling dependencies'
             export NPM_CONFIG_LEGACY_PEER_DEPS=true
             rm -rf node_modules
-            npm ci
+            $NPM_BIN ci
 
             echo '🏗️ Building Next.js app'
-            NODE_ENV=production npm run build
+            NODE_ENV=production $NPM_BIN run build
 
             echo '🚀 Restarting app with PM2'
-            # Load nvm for pm2 as well
-            command -v pm2 >/dev/null 2>&1 || {
-              export NVM_DIR="/root/.nvm"
-              [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-              npm i -g pm2
-            }
+            # Check if pm2 exists, if not install it using the absolute npm path
+            if ! command -v pm2 >/dev/null 2>&1; then
+              $NPM_BIN i -g pm2
+            fi
             
-            # Ensure pm2 uses the correct Node.js version
             pm2 delete worklog-tracker || true
-            PORT=3000 pm2 start npm --name worklog-tracker -- start
+            PORT=3000 pm2 start $NPM_BIN --name worklog-tracker -- start
             pm2 save
-            pm2 startup
           EOF

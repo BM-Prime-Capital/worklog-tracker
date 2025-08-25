@@ -19,6 +19,21 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
+      - name: Install Node.js on EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            # Install Node.js 20.x si pas déjà installé
+            if ! command -v node >/dev/null 2>&1; then
+              echo "📦 Installing Node.js 20..."
+              curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+              sudo apt-get install -y nodejs
+            fi
+            
+            # Vérifier l'installation
+            echo "✅ Node.js version: $(node -v)"
+            echo "✅ npm version: $(npm -v)"
+          EOF
+
       - name: Rsync project to EC2 (exclude .env)
         run: |
           rsync -avz --delete \
@@ -44,14 +59,6 @@ jobs:
             echo '✅ Marking as safe Git directory'
             git config --global --add safe.directory "$APP_PATH"
 
-            # Charger explicitement nvm pour utiliser Node.js v20
-            export NVM_DIR="/root/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-            nvm use 20.19.4
-
-            # OU utiliser les chemins absolus directement
-            # export PATH="/root/.nvm/versions/node/v20.19.4/bin:$PATH"
-
             echo "✅ Node version: $(node -v)"
             echo "✅ NPM version: $(npm -v)"
 
@@ -65,10 +72,11 @@ jobs:
 
             echo '🚀 Restarting app with PM2'
             if ! command -v pm2 >/dev/null 2>&1; then
-              npm i -g pm2
+              sudo npm i -g pm2
             fi
             
             pm2 delete worklog-tracker || true
-            PORT=3000 pm2 start npm --name worklog-tracker -- start
+            PORT=3002 pm2 start npm --name worklog-tracker -- start
             pm2 save
+            pm2 startup
           EOF

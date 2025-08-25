@@ -44,7 +44,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Lint désactivé pour l'instant
+      # Lint désactivé pour l'instant (peut être réactivé plus tard)
       # - name: Lint
       #   run: npm run lint -- --max-warnings=0
 
@@ -89,7 +89,7 @@ jobs:
             fi
             sudo chown -R ubuntu:ubuntu /var/www/worklog-tracker
 
-      - name: Rsync source to EC2 (exclude git/node caches + preserve .env)
+      - name: Rsync source to EC2 (preserve .env)
         run: |
           rsync -az --delete \
             --omit-dir-times --no-perms --no-owner --no-group \
@@ -110,15 +110,18 @@ jobs:
             set -e
             cd /var/www/worklog-tracker
 
+            # Vérifie Node via nvm si dispo
             if command -v nvm >/dev/null 2>&1; then
               export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
               nvm install 20
               nvm use 20
             fi
 
+            # Dépendances + build
             npm ci
             npm run build
 
+            # Redémarrage avec PM2 ou fallback systemd
             if command -v pm2 >/dev/null 2>&1; then
               pm2 describe worklog-tracker >/dev/null 2>&1 && pm2 reload worklog-tracker || pm2 start "npm -- start" --name worklog-tracker
               pm2 save

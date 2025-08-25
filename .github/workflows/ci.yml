@@ -19,11 +19,19 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
-      - name: Fix permissions on EC2
+      - name: Install Node.js on EC2
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-            sudo chmod -R 755 /root/.nvm/versions/node/v20.19.4/bin/
-            sudo chown -R $USER:$USER /root/.nvm/versions/node/v20.19.4/
+            # Install Node.js 20.x si pas déjà installé
+            if ! command -v node >/dev/null 2>&1; then
+              echo "📦 Installing Node.js 20..."
+              curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+              sudo apt-get install -y nodejs
+            fi
+            
+            # Vérifier l'installation
+            echo "✅ Node.js version: $(node -v)"
+            echo "✅ npm version: $(npm -v)"
           EOF
 
       - name: Rsync project to EC2 (exclude .env)
@@ -51,28 +59,24 @@ jobs:
             echo '✅ Marking as safe Git directory'
             git config --global --add safe.directory "$APP_PATH"
 
-            # Define absolute paths to Node.js and npm
-            NODE_BIN="/root/.nvm/versions/node/v20.19.4/bin/node"
-            NPM_BIN="/root/.nvm/versions/node/v20.19.4/bin/npm"
-
-            echo "✅ Node version: $($NODE_BIN -v)"
-            echo "✅ NPM version: $($NPM_BIN -v)"
+            echo "✅ Node version: $(node -v)"
+            echo "✅ NPM version: $(npm -v)"
 
             echo '⚙️ Reinstalling dependencies'
             export NPM_CONFIG_LEGACY_PEER_DEPS=true
             rm -rf node_modules
-            $NPM_BIN ci
+            npm ci
 
             echo '🏗️ Building Next.js app'
-            NODE_ENV=production $NPM_BIN run build
+            NODE_ENV=production npm run build
 
             echo '🚀 Restarting app with PM2'
-            # Check if pm2 exists, if not install it using the absolute npm path
             if ! command -v pm2 >/dev/null 2>&1; then
-              $NPM_BIN i -g pm2
+              sudo npm i -g pm2
             fi
             
             pm2 delete worklog-tracker || true
-            PORT=3000 pm2 start $NPM_BIN --name worklog-tracker -- start
+            PORT=3000 pm2 start npm --name worklog-tracker -- start
             pm2 save
+            pm2 startup
           EOF

@@ -98,7 +98,7 @@ export default function Dashboard() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false)
   const [worklogs, setWorklogs] = useState<JiraWorklog[]>([])
 
-  // Fetch data based on date range
+  // Fetch data based on date range.
   useEffect(() => {
     const fetchData = async () => {
       try {

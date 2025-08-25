@@ -68,13 +68,12 @@ jobs:
             echo '🏗️ Building Next.js app'
             NODE_ENV=production npm run build
 
-            echo '🚀 Restarting app with PM2.'
+            echo '🚀 Restarting app with PM2'
             sudo npm install -g pm2
-            export PATH=$PATH:$(npm root -g)/.bin
+            export PATH=$PATH:/usr/local/lib/node_modules/pm2/bin
             hash -r
 
             pm2 delete worklog-tracker || true
             PORT=3002 pm2 start npm --name worklog-tracker -- start
             pm2 save
-            pm2 startup systemd -u $USER --hp $HOME
           EOF

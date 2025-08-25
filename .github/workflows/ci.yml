@@ -35,21 +35,27 @@ jobs:
 
       - name: Build & restart app on EC2
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << EOF
+          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
             set -euo pipefail
 
             APP_PATH="/var/www/worklog-tracker"
-            cd "\$APP_PATH"
+            cd "$APP_PATH"
 
             echo '✅ Marking as safe Git directory'
-            git config --global --add safe.directory "\$APP_PATH"
+            git config --global --add safe.directory "$APP_PATH"
 
-            # Charger nvm si dispo
-            if [ -f ~/.nvm/nvm.sh ]; then . ~/.nvm/nvm.sh; fi
-            if [ -f .nvmrc ] && command -v nvm >/dev/null 2>&1; then
-              nvm install --silent
-              nvm use --silent
+            # Charger NVM si dispo
+            if [ -s "$HOME/.nvm/nvm.sh" ]; then
+              export NVM_DIR="$HOME/.nvm"
+              . "$NVM_DIR/nvm.sh"
+              nvm use 20
             fi
+
+            # 🔑 Forcer le PATH pour node/npm installés via nvm
+            export PATH=$PATH:/root/.nvm/versions/node/v20.19.4/bin
+
+            echo "✅ Node version: $(node -v || echo 'not found')"
+            echo "✅ NPM version: $(npm -v || echo 'not found')"
 
             echo '⚙️ Reinstalling dependencies'
             export NPM_CONFIG_LEGACY_PEER_DEPS=true

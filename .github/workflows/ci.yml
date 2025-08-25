@@ -44,18 +44,15 @@ jobs:
             echo '✅ Marking as safe Git directory'
             git config --global --add safe.directory "$APP_PATH"
 
-            # Charger NVM si dispo
-            if [ -s "$HOME/.nvm/nvm.sh" ]; then
-              export NVM_DIR="$HOME/.nvm"
-              . "$NVM_DIR/nvm.sh"
-              nvm use 20
-            fi
+            # Load NVM explicitly with full path
+            export NVM_DIR="/root/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            
+            # Use specific Node.js version
+            nvm use 20.19.4
 
-            # 🔑 Forcer le PATH pour node/npm installés via nvm
-            export PATH=$PATH:/root/.nvm/versions/node/v20.19.4/bin
-
-            echo "✅ Node version: $(node -v || echo 'not found')"
-            echo "✅ NPM version: $(npm -v || echo 'not found')"
+            echo "✅ Node version: $(node -v)"
+            echo "✅ NPM version: $(npm -v)"
 
             echo '⚙️ Reinstalling dependencies'
             export NPM_CONFIG_LEGACY_PEER_DEPS=true
@@ -66,8 +63,16 @@ jobs:
             NODE_ENV=production npm run build
 
             echo '🚀 Restarting app with PM2'
-            command -v pm2 >/dev/null 2>&1 || npm i -g pm2
+            # Load nvm for pm2 as well
+            command -v pm2 >/dev/null 2>&1 || {
+              export NVM_DIR="/root/.nvm"
+              [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+              npm i -g pm2
+            }
+            
+            # Ensure pm2 uses the correct Node.js version
             pm2 delete worklog-tracker || true
             PORT=3000 pm2 start npm --name worklog-tracker -- start
             pm2 save
+            pm2 startup
           EOF

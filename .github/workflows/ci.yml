@@ -88,12 +88,16 @@ jobs:
             set -e
             cd /var/www/worklog-tracker
 
-            # Vérifie Node via nvm si dispo
-            if command -v nvm >/dev/null 2>&1; then
-              export NVM_DIR="\$HOME/.nvm" && [ -s "\$NVM_DIR/nvm.sh" ] && . "\$NVM_DIR/nvm.sh"
+            # Charger NVM et Node.js 20
+            if [ -s "$HOME/.nvm/nvm.sh" ]; then
+              export NVM_DIR="$HOME/.nvm"
+              . "$NVM_DIR/nvm.sh"
               nvm install 20
               nvm use 20
             fi
+
+            echo "✅ Node version: \$(node -v)"
+            echo "✅ NPM version: \$(npm -v)"
 
             npm ci
             npm run build

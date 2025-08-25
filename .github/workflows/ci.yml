@@ -22,14 +22,12 @@ jobs:
       - name: Install Node.js on EC2
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-            # Install Node.js 20.x si pas déjà installé
             if ! command -v node >/dev/null 2>&1; then
               echo "📦 Installing Node.js 20..."
               curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
               sudo apt-get install -y nodejs
             fi
-            
-            # Vérifier l'installation
+
             echo "✅ Node.js version: $(node -v)"
             echo "✅ npm version: $(npm -v)"
           EOF
@@ -71,12 +69,12 @@ jobs:
             NODE_ENV=production npm run build
 
             echo '🚀 Restarting app with PM2'
-            # Installation forcée de PM2 dans le PATH global
             sudo npm install -g pm2
             export PATH=$PATH:$(npm root -g)/.bin
-            
+            hash -r
+
             pm2 delete worklog-tracker || true
             PORT=3002 pm2 start npm --name worklog-tracker -- start
             pm2 save
-            pm2 startup
+            pm2 startup systemd -u $USER --hp $HOME
           EOF

@@ -71,9 +71,9 @@ jobs:
             NODE_ENV=production npm run build
 
             echo '🚀 Restarting app with PM2'
-            if ! command -v pm2 >/dev/null 2>&1; then
-              sudo npm i -g pm2
-            fi
+            # Installation forcée de PM2 dans le PATH global
+            sudo npm install -g pm2
+            export PATH=$PATH:$(npm root -g)/.bin
             
             pm2 delete worklog-tracker || true
             PORT=3002 pm2 start npm --name worklog-tracker -- start

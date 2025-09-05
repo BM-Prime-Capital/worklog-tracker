@@ -1,20 +1,24 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { useSession, signIn, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 
-export interface User {
+interface JiraOrganization {
+  organizationName: string
+  domain: string
+  email: string
+  apiToken: string
+}
+
+interface User {
   id: string
   email: string
   firstName: string
   lastName: string
+  role: 'MANAGER' | 'DEVELOPER'
   isEmailVerified: boolean
-  jiraOrganization?: {
-    organizationName: string
-    domain: string
-    email: string
-    apiToken: string
-  }
+  jiraOrganization?: JiraOrganization
 }
 
 interface AuthContextType {
@@ -24,54 +28,51 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
   signup: (email: string, password: string, confirmPassword: string, firstName: string, lastName: string) => Promise<{ success: boolean; error?: string }>
   logout: () => Promise<void>
-  forgotPassword: (email: string) => Promise<{ success: boolean; error?: string }>
-  resetPassword: (token: string, password: string, confirmPassword: string) => Promise<{ success: boolean; error?: string }>
-  updateJiraOrganization: (organizationData: { organizationName: string; domain: string; email: string; apiToken: string }) => Promise<{ success: boolean; error?: string }>
+  updateJiraOrganization: (jiraData: JiraOrganization) => Promise<{ success: boolean; error?: string }>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const { data: session, status } = useSession()
   const router = useRouter()
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    checkAuthStatus()
-  }, [])
-
-  const checkAuthStatus = async () => {
-    try {
-      const response = await fetch('/api/auth/me')
-      if (response.ok) {
-        const userData = await response.json()
-        setUser(userData.user)
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error)
-    } finally {
+    if (status === 'loading') {
+      setIsLoading(true)
+    } else {
       setIsLoading(false)
     }
-  }
+  }, [status])
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
       })
 
-      const data = await response.json()
-
-      if (response.ok) {
-        setUser(data.user)
-        return { success: true }
-      } else {
-        return { success: false, error: data.error }
+      if (result?.error) {
+        return { success: false, error: result.error }
       }
+
+      if (result?.ok) {
+        // Redirect based on user role
+        const user = session?.user as { role?: 'ADMIN' | 'MANAGER' | 'DEVELOPER' }
+        if (user?.role === 'MANAGER') {
+          router.push('/dashboard/manager')
+        } else {
+          router.push('/dashboard/developer')
+        }
+        return { success: true }
+      }
+
+      return { success: false, error: 'Login failed' }
     } catch (error) {
-      return { success: false, error: 'An error occurred during login' }
+      console.error('Login error:', error)
+      return { success: false, error: 'An unexpected error occurred' }
     }
   }
 
@@ -79,115 +80,74 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, confirmPassword, firstName, lastName })
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          confirmPassword,
+          firstName,
+          lastName,
+        }),
       })
 
       const data = await response.json()
 
-      if (response.ok) {
-        setUser(data.user)
-        return { success: true }
-      } else {
-        return { success: false, error: data.error }
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Signup failed' }
       }
+
+      return { success: true }
     } catch (error) {
-      return { success: false, error: 'An error occurred during signup' }
+      console.error('Signup error:', error)
+      return { success: false, error: 'An unexpected error occurred' }
     }
   }
 
   const logout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' })
-      setUser(null)
-      // Redirect to login page after logout
+      await signOut({ redirect: false })
       router.push('/auth/login')
     } catch (error) {
       console.error('Logout error:', error)
-      // Even if logout API fails, clear local state and redirect
-      setUser(null)
-      router.push('/auth/login')
     }
   }
 
-  const forgotPassword = async (email: string) => {
-    try {
-      const response = await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        return { success: true }
-      } else {
-        return { success: false, error: data.error }
-      }
-    } catch (error) {
-      return { success: false, error: 'An error occurred' }
-    }
-  }
-
-  const resetPassword = async (token: string, password: string, confirmPassword: string) => {
-    try {
-      const response = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password, confirmPassword })
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        return { success: true }
-      } else {
-        return { success: false, error: data.error }
-      }
-    } catch (error) {
-      return { success: false, error: 'An error occurred' }
-    }
-  }
-
-  const updateJiraOrganization = async (organizationData: { organizationName: string; domain: string; email: string; apiToken: string }) => {
+  const updateJiraOrganization = async (jiraData: JiraOrganization) => {
     try {
       const response = await fetch('/api/user/jira-organization', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(organizationData)
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(jiraData),
       })
 
       const data = await response.json()
 
-      if (response.ok) {
-        setUser(prev => prev ? { ...prev, jiraOrganization: data.jiraOrganization } : null)
-        return { success: true }
-      } else {
-        return { success: false, error: data.error }
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Failed to update Jira organization' }
       }
+
+      return { success: true }
     } catch (error) {
-      return { success: false, error: 'An error occurred' }
+      console.error('Update Jira organization error:', error)
+      return { success: false, error: 'An unexpected error occurred' }
     }
   }
 
   const value: AuthContextType = {
-    user,
+    user: session?.user ? session.user as User : null,
     isLoading,
-    isAuthenticated: !!user,
+    isAuthenticated: !!session?.user,
     login,
     signup,
     logout,
-    forgotPassword,
-    resetPassword,
-    updateJiraOrganization
+    updateJiraOrganization,
   }
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  )
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {

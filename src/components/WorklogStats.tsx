@@ -1,6 +1,7 @@
 'use client'
 
-import { Clock, Users, FileText, Calendar, Loader2 } from 'lucide-react'
+import { Clock, Users, FileText, Calendar } from 'lucide-react'
+import { formatTimeFromHours } from '@/lib/timeUtils'
 
 interface WorklogStatsProps {
   totalHours: number
@@ -17,9 +18,7 @@ export default function WorklogStats({
   uniqueIssues, 
   isLoading 
 }: WorklogStatsProps) {
-  const formatHours = (hours: number) => {
-    return `${Math.round(hours * 100) / 100}h`
-  }
+  // Using formatTimeFromHours from timeUtils for better UX
 
   if (isLoading) {
     return (
@@ -44,7 +43,7 @@ export default function WorklogStats({
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-600">Total Hours</p>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{formatHours(totalHours)}</p>
+            <p className="text-3xl font-bold text-gray-900 mt-2">{formatTimeFromHours(totalHours)}</p>
             <p className="text-xs text-gray-500 mt-1">Time logged</p>
           </div>
           <div className="p-3 bg-blue-50 rounded-lg">

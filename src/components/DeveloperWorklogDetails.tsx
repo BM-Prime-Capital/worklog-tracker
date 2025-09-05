@@ -5,6 +5,7 @@ import { Clock, User, Calendar, MessageSquare, ExternalLink, Filter, ChevronDown
 import { Developer } from '@/lib/types'
 import { JiraWorklog } from '@/lib/jiraApiEnhanced'
 import WorklogDetailsModal from './WorklogDetailsModal'
+import { formatTimeFromSeconds } from '@/lib/timeUtils'
 
 interface DeveloperWorklogDetailsProps {
   developers: Developer[]
@@ -62,10 +63,7 @@ export default function DeveloperWorklogDetails({ developers, isLoading }: Devel
     setExpandedDevelopers(newExpanded)
   }
 
-  const formatHours = (seconds: number) => {
-    const hours = seconds / 3600
-    return `${Math.round(hours * 100) / 100}h`
-  }
+  // Using formatTimeFromSeconds from timeUtils for better UX
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -189,13 +187,13 @@ export default function DeveloperWorklogDetails({ developers, isLoading }: Devel
                       <div>
                         <h3 className="font-semibold text-gray-900">{developerName}</h3>
                         <p className="text-sm text-gray-600">
-                          {entries.length} entr{entries.length !== 1 ? 'ies' : 'y'} • {formatHours(totalHours * 3600)} total
+                          {entries.length} entr{entries.length !== 1 ? 'ies' : 'y'} • {formatTimeFromSeconds(totalHours * 3600)} total
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
                       <span className="text-sm font-medium text-gray-900">
-                        {formatHours(totalHours * 3600)}
+                        {formatTimeFromSeconds(totalHours * 3600)}
                       </span>
                       {isExpanded ? (
                         <ChevronUp className="w-4 h-4 text-gray-500" />
@@ -222,7 +220,7 @@ export default function DeveloperWorklogDetails({ developers, isLoading }: Devel
                                 {entry.issueKey}
                               </span>
                               <span className={`text-sm font-semibold ${getTimeColor(entry.timeSpentSeconds)}`}>
-                                {formatHours(entry.timeSpentSeconds)}
+                                {formatTimeFromSeconds(entry.timeSpentSeconds)}
                               </span>
                             </div>
                             <p className="text-sm text-gray-900 mb-1">{entry.summary}</p>
@@ -233,7 +231,7 @@ export default function DeveloperWorklogDetails({ developers, isLoading }: Devel
                               </span>
                               <span className="flex items-center">
                                 <Clock className="w-3 h-3 mr-1" />
-                                {formatHours(entry.timeSpentSeconds)}
+                                {formatTimeFromSeconds(entry.timeSpentSeconds)}
                               </span>
                             </div>
                           </div>
@@ -271,7 +269,7 @@ export default function DeveloperWorklogDetails({ developers, isLoading }: Devel
             </div>
             <div>
               <p className="text-2xl font-bold text-blue-600">
-                {formatHours(filteredEntries.reduce((sum, entry) => sum + entry.timeSpentSeconds, 0))}
+                {formatTimeFromSeconds(filteredEntries.reduce((sum, entry) => sum + entry.timeSpentSeconds, 0))}
               </p>
               <p className="text-sm text-gray-600">Total Hours</p>
             </div>

@@ -8,7 +8,7 @@ export async function GET(
   try {
     // Await the params Promise for Next.js 15+ compatibility
     const { id: mediaId } = await params
-    
+
     // Get credentials from cookies or headers
     const credentials = await getCredentialsFromRequest(request)
     if (!credentials) {
@@ -33,7 +33,7 @@ export async function GET(
       contentType = fileResponse.headers['content-type'] || 'application/octet-stream'
       console.log('Successfully fetched from Media API')
     } catch (mediaError) {
-      console.log('Media API failed, trying attachment endpoint...')
+      // console.log('Media API failed, trying attachment endpoint...')
       try {
         // Try the attachment content endpoint
         fileResponse = await axios.get(`${baseUrl}/attachment/content/${mediaId}`, {
@@ -43,26 +43,26 @@ export async function GET(
         contentType = fileResponse.headers['content-type'] || 'application/octet-stream'
         console.log('Successfully fetched from attachment endpoint')
       } catch (attachmentError) {
-        console.log('Attachment endpoint failed, trying metadata endpoint...')
+        // console.log('Attachment endpoint failed, trying metadata endpoint...')
         try {
           // Try to get metadata first, then content
           const metadataResponse = await axios.get(`${baseUrl}/attachment/${mediaId}`, {
             headers: { Authorization: `Basic ${auth}` }
           })
-          
+
           const attachment = metadataResponse.data
           filename = attachment.filename || `file-${mediaId}`
           contentType = attachment.mimeType || 'application/octet-stream'
-          
+
           // Now get the actual content
           fileResponse = await axios.get(`${baseUrl}/attachment/${mediaId}`, {
             headers: { Authorization: `Basic ${auth}` },
             responseType: 'arraybuffer'
           })
-          console.log('Successfully fetched from metadata + content endpoint')
+          // console.log('Successfully fetched from metadata + content endpoint')
         } catch (metadataError) {
           console.error('All endpoints failed:', { mediaError, attachmentError, metadataError })
-          return NextResponse.json({ 
+          return NextResponse.json({
             error: 'Failed to fetch file from all Jira endpoints',
             mediaId,
             details: 'Tried Media API, Attachment Content, and Metadata endpoints'
@@ -76,8 +76,8 @@ export async function GET(
     response.headers.set('Content-Type', contentType)
     response.headers.set('Content-Disposition', `inline; filename="${filename}"`)
     response.headers.set('Cache-Control', 'public, max-age=3600')
-    
-    console.log(`Successfully served file: ${filename} (${contentType})`)
+
+    // console.log(`Successfully served file: ${filename} (${contentType})`)
     return response
   } catch (error) {
     console.error('Error fetching media file:', error)
@@ -115,4 +115,4 @@ async function getCredentialsFromRequest(request: NextRequest) {
   }
 
   return null
-} 
+}

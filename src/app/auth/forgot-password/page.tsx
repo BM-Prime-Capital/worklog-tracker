@@ -3,11 +3,9 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Mail, ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react'
-import { useAuth } from '@/contexts/AuthContextNew'
 import { forgotPasswordSchema } from '@/lib/validation'
 
 export default function ForgotPasswordPage() {
-  const { forgotPassword } = useAuth()
   const [email, setEmail] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -25,11 +23,14 @@ export default function ForgotPasswordPage() {
       forgotPasswordSchema.parse({ email })
       setErrors({})
       return true
-    } catch (error: any) {
+    } catch (error: unknown) {
       const newErrors: Record<string, string> = {}
-      error.errors.forEach((err: any) => {
-        newErrors[err.path[0]] = err.message
-      })
+      if (error && typeof error === 'object' && 'errors' in error) {
+        const zodError = error as { errors: Array<{ path: string[]; message: string }> }
+        zodError.errors.forEach((err) => {
+          newErrors[err.path[0]] = err.message
+        })
+      }
       setErrors(newErrors)
       return false
     }
@@ -43,12 +44,24 @@ export default function ForgotPasswordPage() {
     setIsLoading(true)
     setErrors({})
 
-    const result = await forgotPassword(email)
+    try {
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      })
 
-    if (result.success) {
-      setSuccess(true)
-    } else {
-      setErrors({ submit: result.error || 'Failed to send reset email' })
+      const data = await response.json()
+
+      if (response.ok) {
+        setSuccess(true)
+      } else {
+        setErrors({ submit: data.error || 'Failed to send reset email' })
+      }
+    } catch {
+      setErrors({ submit: 'An unexpected error occurred' })
     }
 
     setIsLoading(false)
@@ -61,7 +74,7 @@ export default function ForgotPasswordPage() {
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Check Your Email</h2>
           <p className="text-gray-600 mb-6">
-            We've sent a password reset link to <strong>{email}</strong>. 
+            We&apos;ve sent a password reset link to <strong>{email}</strong>. 
             Please check your email and follow the instructions to reset your password.
           </p>
           <Link
@@ -83,7 +96,7 @@ export default function ForgotPasswordPage() {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Forgot Password</h1>
           <p className="text-gray-600">
-            Enter your email address and we'll send you a link to reset your password.
+            Enter your email address and we&apos;ll send you a link to reset your password.
           </p>
         </div>
 

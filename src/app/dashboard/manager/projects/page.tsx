@@ -1,30 +1,22 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '@/contexts/AuthContextNew'
+import { useSession } from 'next-auth/react'
+import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import { jiraApiEnhanced as jiraApi } from '@/lib/jiraApiEnhanced'
 import {
   FolderOpen,
   Clock,
   Users,
-  TrendingUp,
   Calendar,
   ExternalLink,
   Search,
-  Filter,
   Activity,
-  Star,
-  StarOff,
   MoreVertical,
-  AlertCircle,
   CheckCircle,
-  Circle,
-  Play,
-  Pause,
   Archive
 } from 'lucide-react'
-import DashboardLayout from '@/components/DashboardLayout'
+import DashboardLayout from '@/components/layout/DashboardLayout'
 
 interface Project {
   id: string
@@ -101,18 +93,14 @@ interface Issue {
 }
 
 export default function ProjectsPage() {
-  const { user, isLoading, isAuthenticated } = useAuth()
-  const router = useRouter()
+  const { data: session } = useSession()
   const [isDataLoading, setIsDataLoading] = useState(true)
   const [projects, setProjects] = useState<Project[]>([])
   const [recentIssues, setRecentIssues] = useState<Issue[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [projectFilter, setProjectFilter] = useState('all')
-  const [statusFilter, setStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState<'name' | 'key' | 'updated'>('name')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
-  const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set())
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
@@ -258,10 +246,10 @@ export default function ProjectsPage() {
       }
     }
 
-    if (user) {
+    if (session?.user) {
       fetchData()
     }
-  }, [user])
+  }, [session])
 
   // Filter and sort projects
   const filteredAndSortedProjects = projects
@@ -310,23 +298,7 @@ export default function ProjectsPage() {
   // Simple recent issues display - no filtering
   const displayIssues = recentIssues.slice(0, 10) // Show only top 10 recent issues
 
-  const getStatusColor = (statusCategory: string) => {
-    switch (statusCategory) {
-      case 'new': return 'bg-blue-100 text-blue-800'
-      case 'indeterminate': return 'bg-yellow-100 text-yellow-800'
-      case 'done': return 'bg-green-100 text-green-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
 
-  const getStatusIcon = (statusCategory: string) => {
-    switch (statusCategory) {
-      case 'new': return <Circle className="w-4 h-4" />
-      case 'indeterminate': return <Play className="w-4 h-4" />
-      case 'done': return <CheckCircle className="w-4 h-4" />
-      default: return <AlertCircle className="w-4 h-4" />
-    }
-  }
 
   const translateStatus = (statusCategory: string, statusName?: string): string => {
     // If status is done, return as is
@@ -389,11 +361,7 @@ export default function ProjectsPage() {
     })
   }
 
-  const getIssuesByProject = (projectKey: string) => {
-    return recentIssues.filter(issue =>
-      issue?.fields?.project?.key === projectKey
-    )
-  }
+
 
     const getProjectStats = (projectKey: string) => {
     const project = projects.find(p => p.key === projectKey)
@@ -491,19 +459,9 @@ export default function ProjectsPage() {
     }
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading projects...</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <DashboardLayout
+    <ProtectedRoute allowedRoles={['MANAGER']}>
+      <DashboardLayout
       title="Projects"
       subtitle="Manage and view all Jira projects and recent tasks"
       actions={
@@ -1109,6 +1067,7 @@ export default function ProjectsPage() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+      </DashboardLayout>
+    </ProtectedRoute>
   )
 }

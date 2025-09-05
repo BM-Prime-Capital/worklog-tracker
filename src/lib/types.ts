@@ -19,6 +19,8 @@ export interface TeamData {
   color: string
 }
 
+export type UserRole = "ADMIN" | "MANAGER" | "DEVELOPER"
+
 export interface ProductivityData {
   name: string
   value: number

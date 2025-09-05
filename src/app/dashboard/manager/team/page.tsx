@@ -1,36 +1,27 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '@/contexts/AuthContextNew'
+import { useState, useEffect, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
+import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import { jiraApiEnhanced as jiraApi, JiraUser } from '@/lib/jiraApiEnhanced'
 import { userService } from '@/lib/userService'
-import { User } from '@/lib/types'
 import {
   Users,
   Search,
-  Filter,
   MoreVertical,
   Mail,
   Clock,
-  Calendar,
   UserPlus,
-  UserCheck,
-  UserX,
   Activity,
   Globe,
-  Phone,
   Building,
-  Star,
-  StarOff,
   Edit3,
-  MessageSquare,
   Database,
   Cloud,
   RefreshCw,
   Eye
 } from 'lucide-react'
-import DashboardLayout from '@/components/DashboardLayout'
+import DashboardLayout from '@/components/layout/DashboardLayout'
 
 interface TeamMember extends Partial<JiraUser> {
   // Core fields that exist in both Jira and database users
@@ -78,8 +69,8 @@ interface TeamMember extends Partial<JiraUser> {
 }
 
 export default function TeamPage() {
-  const { user, isLoading, isAuthenticated } = useAuth()
-  const router = useRouter()
+  const { data: session } = useSession()
+  const user = session?.user
   const [isDataLoading, setIsDataLoading] = useState(true)
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [filteredMembers, setFilteredMembers] = useState<TeamMember[]>([])
@@ -89,7 +80,7 @@ export default function TeamPage() {
   const [sourceFilter, setSourceFilter] = useState<'all' | 'jira' | 'enriched' | 'database'>('all')
   const [sortBy, setSortBy] = useState<'name' | 'email' | 'lastActivity'>('name')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
-  const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set())
+
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -137,6 +128,55 @@ export default function TeamPage() {
     database: 'loading'
   })
 
+  const getTimeAgo = (timestamp: string) => {
+    const now = new Date()
+    const date = new Date(timestamp)
+    const diffInMs = now.getTime() - date.getTime()
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60))
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60))
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24))
+
+    if (diffInMinutes < 60) {
+      return `${diffInMinutes}m ago`
+    } else if (diffInHours < 24) {
+      return `${diffInHours}h ago`
+    } else {
+      return `${diffInDays}d ago`
+    }
+  }
+
+  const findUserLastActivity = useCallback((worklogs: Array<{
+    author: { displayName: string; emailAddress: string; accountId?: string }
+    timeSpentSeconds: number
+    issueKey: string
+    summary: string
+    started: string
+  }>, accountId: string) => {
+    // Find the most recent worklog entry by this user
+    const userWorklogs = worklogs.filter(worklog => 
+      worklog.author.accountId === accountId
+    )
+
+    if (userWorklogs.length === 0) return undefined
+
+    const mostRecent = userWorklogs.reduce((latest, current) => {
+      const latestDate = new Date(latest.started)
+      const currentDate = new Date(current.started)
+      return currentDate > latestDate ? current : latest
+    })
+
+    const timestamp = mostRecent.started
+    const timeAgo = getTimeAgo(timestamp)
+    
+    return {
+      issueKey: mostRecent.issueKey,
+      summary: mostRecent.summary,
+      action: `Last logged ${Math.round(mostRecent.timeSpentSeconds / 3600 * 10) / 10}h`,
+      timestamp,
+      timeAgo
+    }
+  }, [])
+
   // Fetch team members from both Jira and database
   useEffect(() => {
     const fetchTeamMembers = async () => {
@@ -147,6 +187,7 @@ export default function TeamPage() {
         const [jiraUsers, databaseUsers] = await Promise.all([
           jiraApi.getUsers().then(users => {
             setSyncStatus(prev => ({ ...prev, jira: 'success' }))
+            console.log('Jira users:', users)
             return users
           }).catch(error => {
             console.error('Error fetching Jira users:', error)
@@ -193,7 +234,7 @@ export default function TeamPage() {
               displayName: dbUser.displayName,
               firstName: dbUser.firstName, // Use actual first name from database
               avatar: getInitials(dbUser.displayName),
-              team: dbUser.department ? detectTeam(dbUser.department) : undefined,
+              team: dbUser.department ? detectTeam() : undefined,
               role: dbUser.role || undefined,
               department: dbUser.department,
               employmentType: (dbUser.employmentType as 'intern' | 'permanent') || 'permanent',
@@ -227,7 +268,7 @@ export default function TeamPage() {
               ...mergedMembers[existingIndex],
               // Use database values for matched users
               email: dbMember.email,
-              team: dbMember.team || detectTeam(dbMember.department || ''),
+              team: dbMember.team || detectTeam(),
               role: dbMember.role || 'Developer',
               department: dbMember.department,
               employmentType: dbMember.employmentType,
@@ -299,7 +340,7 @@ export default function TeamPage() {
     if (user) {
       fetchTeamMembers()
     }
-  }, [user])
+  }, [user, findUserLastActivity])
 
   // Filter and sort team members
   useEffect(() => {
@@ -356,69 +397,15 @@ export default function TeamPage() {
     })
 
     setFilteredMembers(sorted)
-  }, [teamMembers, searchTerm, activityFilter, teamFilter, sortBy, sortOrder])
+  }, [teamMembers, searchTerm, activityFilter, teamFilter, sourceFilter, sortBy, sortOrder])
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase()
   }
 
-  const detectTeam = (name: string) => {
+  const detectTeam = () => {
     const teams = ['Frontend', 'Backend', 'Mobile', 'DevOps', 'QA', 'Design', 'Product']
     return teams[Math.floor(Math.random() * teams.length)]
-  }
-
-  const detectRole = (name: string) => {
-    const roles = ['Developer', 'Senior Developer', 'Lead Developer', 'Architect', 'Manager']
-    return roles[Math.floor(Math.random() * roles.length)]
-  }
-
-  const findUserLastActivity = (worklogs: Array<{
-    author: { displayName: string; emailAddress: string; accountId?: string }
-    timeSpentSeconds: number
-    issueKey: string
-    summary: string
-    started: string
-  }>, accountId: string) => {
-    // Find the most recent worklog entry by this user
-    const userWorklogs = worklogs.filter(worklog => 
-      worklog.author.accountId === accountId
-    )
-
-    if (userWorklogs.length === 0) return undefined
-
-    const mostRecent = userWorklogs.reduce((latest, current) => {
-      const latestDate = new Date(latest.started)
-      const currentDate = new Date(current.started)
-      return currentDate > latestDate ? current : latest
-    })
-
-    const timestamp = mostRecent.started
-    const timeAgo = getTimeAgo(timestamp)
-    
-    return {
-      issueKey: mostRecent.issueKey,
-      summary: mostRecent.summary,
-      action: `Last logged ${Math.round(mostRecent.timeSpentSeconds / 3600 * 10) / 10}h`,
-      timestamp,
-      timeAgo
-    }
-  }
-
-  const getTimeAgo = (timestamp: string) => {
-    const now = new Date()
-    const date = new Date(timestamp)
-    const diffInMs = now.getTime() - date.getTime()
-    const diffInMinutes = Math.floor(diffInMs / (1000 * 60))
-    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60))
-    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24))
-
-    if (diffInMinutes < 60) {
-      return `${diffInMinutes}m ago`
-    } else if (diffInHours < 24) {
-      return `${diffInHours}h ago`
-    } else {
-      return `${diffInDays}d ago`
-    }
   }
 
   const isRecentActivity = (timestamp: string) => {
@@ -441,23 +428,7 @@ export default function TeamPage() {
     return 'text-gray-500'
   }
 
-  const toggleFavorite = (memberId: string) => {
-    setTeamMembers(prev => prev.map(member =>
-      member.id === memberId
-        ? { ...member, isFavorite: !member.isFavorite }
-        : member
-    ))
-  }
 
-  const toggleMemberSelection = (memberId: string) => {
-    const newSelected = new Set(selectedMembers)
-    if (newSelected.has(memberId)) {
-      newSelected.delete(memberId)
-    } else {
-      newSelected.add(memberId)
-    }
-    setSelectedMembers(newSelected)
-  }
 
   const getUniqueTeams = () => {
     const teams = teamMembers.map(member => member.team).filter(Boolean)
@@ -568,7 +539,7 @@ export default function TeamPage() {
     setIsSubmitting(true)
     
     try {
-      // Create user using the user service
+      // Invite user using the new invitation API
       const userData = {
         firstName: newMemberForm.firstName,
         lastName: newMemberForm.lastName,
@@ -577,7 +548,7 @@ export default function TeamPage() {
         employmentType: newMemberForm.employmentType as 'permanent' | 'intern'
       }
       
-      const response = await fetch('/api/users', {
+      const response = await fetch('/api/users/invite', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -588,17 +559,19 @@ export default function TeamPage() {
       const result = await response.json()
       
       if (result.success) {
+        // Show success message
+        alert(`User invited successfully! An invitation email has been sent to ${userData.email}`)
         // Refresh the team members list
         window.location.reload()
       } else {
-        console.error('Failed to create user:', result.message)
-        // TODO: Show error message to user
+        console.error('Failed to invite user:', result.message)
+        alert(`Failed to invite user: ${result.message}`)
       }
       
       closeAddMemberModal()
     } catch (error) {
-      console.error('Error adding member:', error)
-      // TODO: Show error message to user
+      console.error('Error inviting member:', error)
+      alert('An error occurred while inviting the user. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -647,19 +620,9 @@ export default function TeamPage() {
     }
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading team...</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <DashboardLayout
+    <ProtectedRoute allowedRoles={['MANAGER']}>
+      <DashboardLayout
       title="Team Management"
       subtitle="Manage and view team members from Jira, enriched with database information"
       actions={
@@ -676,7 +639,7 @@ export default function TeamPage() {
             className="flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
           >
             <UserPlus className="w-4 h-4 mr-2" />
-            Add Member
+            Invite Member
           </button>
         </div>
       }
@@ -948,8 +911,6 @@ export default function TeamPage() {
                       <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              // Show context menu
-                              const rect = e.currentTarget.getBoundingClientRect()
                               // For now, just open view mode - you can enhance this with a proper context menu
                               openEditModal(member, 'view')
                             }}
@@ -1139,8 +1100,8 @@ export default function TeamPage() {
             {/* Modal Header - Fixed */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">Add New Team Member</h2>
-                <p className="text-sm text-gray-600">Create a new team member account</p>
+                <h2 className="text-xl font-bold text-gray-900">Invite New Team Member</h2>
+                <p className="text-sm text-gray-600">Send an invitation to join the team</p>
               </div>
               <button
                 onClick={closeAddMemberModal}
@@ -1279,10 +1240,10 @@ export default function TeamPage() {
                 {isSubmitting ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Adding...
+                    Inviting...
                   </>
                 ) : (
-                  'Add Member'
+                  'Send Invitation'
                 )}
               </button>
             </div>
@@ -1773,6 +1734,7 @@ export default function TeamPage() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+      </DashboardLayout>
+    </ProtectedRoute>
   )
 }

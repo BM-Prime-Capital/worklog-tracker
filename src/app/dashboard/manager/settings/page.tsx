@@ -1,14 +1,23 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/contexts/AuthContextNew'
+import { useSession } from 'next-auth/react'
+import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import { jiraOrganizationSchema } from '@/lib/validation'
-import { User, Settings, Globe, Key, Building, Save, CheckCircle, AlertCircle, LogOut, Download, Calendar, Users, Clock, TrendingUp, Filter, Edit, X } from 'lucide-react'
+import { User, Settings, Globe, Key, Building, Save, CheckCircle, AlertCircle, Download, Edit, X } from 'lucide-react'
 import DateRangePicker from '@/components/DateRangePicker'
-import DashboardLayout from '@/components/DashboardLayout'
+import DashboardLayout from '@/components/layout/DashboardLayout'
 
-export default function ProfilePage() {
-  const { user, updateJiraOrganization, logout } = useAuth()
+export default function ManagerSettingsPage() {
+  const { data: session } = useSession()
+  const user = session?.user as {
+    id?: string
+    email?: string
+    firstName?: string
+    lastName?: string
+    isEmailVerified?: boolean
+    jiraOrganization?: { organizationName: string; domain: string; email: string; apiToken: string }
+  }
   const [jiraData, setJiraData] = useState({
     organizationName: '',
     domain: '',
@@ -21,7 +30,6 @@ export default function ProfilePage() {
   })
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [success, setSuccess] = useState(false)
   const [selectedDateRange, setSelectedDateRange] = useState('this-week')
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [profileSuccess, setProfileSuccess] = useState(false)
@@ -84,14 +92,30 @@ export default function ProfilePage() {
     setErrors({})
 
     try {
-      // Here you would typically make an API call to update the profile
-      // For now, we'll simulate a successful update
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      setProfileSuccess(true)
-      setIsEditingProfile(false)
-      setTimeout(() => setProfileSuccess(false), 3000)
+      const response = await fetch('/api/users/me', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          firstName: userData.firstName,
+          lastName: userData.lastName
+        }),
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        setProfileSuccess(true)
+        setIsEditingProfile(false)
+        setTimeout(() => setProfileSuccess(false), 3000)
+        // Refresh the page to get updated user data
+        window.location.reload()
+      } else {
+        setErrors({ profile: result.error || 'Failed to update profile' })
+      }
     } catch (error) {
+      console.error('Error updating profile:', error)
       setErrors({ profile: 'Failed to update profile' })
     } finally {
       setIsLoading(false)
@@ -119,14 +143,33 @@ export default function ProfilePage() {
     setIsLoading(true)
     setErrors({})
 
-    const result = await updateJiraOrganization(jiraData)
+    try {
+      const response = await fetch('/api/user/jira-organization', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          domain: jiraData.domain,
+          email: jiraData.email,
+          apiToken: jiraData.apiToken
+        }),
+      })
 
-    if (result.success) {
-      setOrganizationSuccess(true)
-      setIsEditingOrganization(false)
-      setTimeout(() => setOrganizationSuccess(false), 3000)
-    } else {
-      setErrors({ organization: result.error || 'Failed to update organization settings' })
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        setOrganizationSuccess(true)
+        setIsEditingOrganization(false)
+        setTimeout(() => setOrganizationSuccess(false), 3000)
+        // Refresh the page to get updated user data
+        window.location.reload()
+      } else {
+        setErrors({ organization: result.error || 'Failed to update organization settings' })
+      }
+    } catch (error) {
+      console.error('Error updating organization:', error)
+      setErrors({ organization: 'Failed to update organization settings' })
     }
 
     setIsLoading(false)
@@ -150,9 +193,7 @@ export default function ProfilePage() {
     }
   }
 
-  const handleLogout = () => {
-    logout()
-  }
+
 
   if (!user) {
     return (
@@ -166,9 +207,10 @@ export default function ProfilePage() {
   }
 
   return (
-    <DashboardLayout
-      title="Profile Settings"
-      subtitle="Manage your account and Jira organization settings"
+    <ProtectedRoute allowedRoles={['MANAGER']}>
+      <DashboardLayout
+        title="Manager Settings"
+        subtitle="Manage your account and Jira organization settings"
       actions={
         <div className="flex items-center space-x-3">
           <DateRangePicker 
@@ -494,6 +536,7 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+      </DashboardLayout>
+    </ProtectedRoute>
   )
 } 

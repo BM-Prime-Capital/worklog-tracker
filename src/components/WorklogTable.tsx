@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import { Search, Filter, SortAsc, SortDesc, ExternalLink, User, Clock, Calendar } from 'lucide-react'
 import { JiraWorklog } from '@/lib/jiraApiEnhanced'
 import WorklogDetailsModal from './WorklogDetailsModal'
+import { formatTimeFromSeconds } from '@/lib/timeUtils'
 
 interface WorklogTableProps {
   worklogs: JiraWorklog[]
@@ -76,10 +77,7 @@ export default function WorklogTable({ worklogs, isLoading, dateRange }: Worklog
     }
   }
 
-  const formatHours = (seconds: number) => {
-    const hours = seconds / 3600
-    return `${Math.round(hours * 100) / 100}h`
-  }
+  // Using formatTimeFromSeconds from timeUtils for better UX
 
   const formatDate = (dateString: string) => {
     return format(new Date(dateString), 'MMM d, yyyy')
@@ -261,7 +259,7 @@ export default function WorklogTable({ worklogs, isLoading, dateRange }: Worklog
                     <div className="flex items-center">
                       <Clock className="w-4 h-4 text-green-600 mr-1" />
                       <span className="text-sm font-medium text-gray-900">
-                        {formatHours(worklog.timeSpentSeconds)}
+                        {formatTimeFromSeconds(worklog.timeSpentSeconds)}
                       </span>
                     </div>
                   </td>
@@ -289,7 +287,7 @@ export default function WorklogTable({ worklogs, isLoading, dateRange }: Worklog
           <div className="flex items-center justify-between text-sm text-gray-600">
             <span>Showing {filteredAndSortedWorklogs.length} of {worklogs.length} entries</span>
             <div className="flex items-center space-x-4">
-              <span>Total: {formatHours(filteredAndSortedWorklogs.reduce((sum, w) => sum + w.timeSpentSeconds, 0))}</span>
+              <span>Total: {formatTimeFromSeconds(filteredAndSortedWorklogs.reduce((sum, w) => sum + w.timeSpentSeconds, 0))}</span>
             </div>
           </div>
         </div>

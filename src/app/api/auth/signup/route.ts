@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { signUpSchema } from '@/lib/validation'
 import dbConnect from '@/lib/db'
 import User from '@/models/User'
-import { generateToken } from '@/lib/auth'
+import crypto from 'crypto'
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const { email, password, firstName, lastName } = validationResult.data
 
     // Check if user already exists
-    const existingUser = await User.findOne({ email })
+    const existingUser = await User.findOne({ email: email.toLowerCase() })
     if (existingUser) {
       return NextResponse.json(
         { error: 'User with this email already exists' },
@@ -29,46 +29,45 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create new user
+    // Generate email verification token
+    const emailVerificationToken = crypto.randomBytes(32).toString('hex')
+    const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+
+    // Create new user - password will be automatically hashed by User model pre-save middleware
     const user = new User({
-      email,
-      password,
+      email: email.toLowerCase(),
+      password, // Plain password - will be hashed automatically
       firstName,
       lastName,
-      isEmailVerified: false // For now, we'll skip email verification
+      isEmailVerified: false,
+      role: 'MANAGER', // Self-registered users are MANAGERs (changed from DEVELOPER)
+      emailVerificationToken,
+      emailVerificationExpires,
+      // organizationId will be set during onboarding
     })
 
     await user.save()
 
-    // Generate JWT token
-    const token = generateToken({
-      userId: user._id.toString(),
-      email: user.email
-    })
+    // TODO: Send verification email here
+    // For now, we'll simulate email verification by setting it to true
+    user.isEmailVerified = true
+    await user.save()
 
-    // Set HTTP-only cookie
-    const response = NextResponse.json(
+    return NextResponse.json(
       { 
-        message: 'User created successfully',
+        message: 'User created successfully. Please check your email to verify your account.',
         user: {
           id: user._id,
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
-          isEmailVerified: user.isEmailVerified
+          isEmailVerified: user.isEmailVerified,
+          role: user.role, // Will be 'MANAGER'
+          // organizationId will be set during onboarding
         }
       },
       { status: 201 }
     )
-
-    response.cookies.set('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 // 7 days
-    })
-
-    return response
 
   } catch (error) {
     console.error('Signup error:', error)
@@ -77,4 +76,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-} 
+}

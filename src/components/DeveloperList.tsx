@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Search, Filter, MoreVertical, Loader2 } from 'lucide-react'
+import { Search, MoreVertical, Loader2 } from 'lucide-react'
 import { Developer } from '@/lib/types'
+import { formatTimeFromHours } from '@/lib/timeUtils'
 
 interface DeveloperListProps {
   developers: Developer[]
@@ -11,7 +12,7 @@ interface DeveloperListProps {
 
 export default function DeveloperList({ developers, isLoading }: DeveloperListProps) {
   const [searchTerm, setSearchTerm] = useState('')
-  const [expandedDeveloper, setExpandedDeveloper] = useState<string | null>(null)
+  // const [expandedDeveloper, setExpandedDeveloper] = useState<string | null>(null) // Not used yet
 
   const filteredDevelopers = developers.filter(dev => {
     const matchesSearch = dev.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -91,7 +92,7 @@ export default function DeveloperList({ developers, isLoading }: DeveloperListPr
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {developer.hours}h
+                    {formatTimeFromHours(developer.hours)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {developer.tasks}

@@ -9,7 +9,7 @@ import { Calendar, Clock, Filter, Download, CalendarDays, CalendarRange, Calenda
 import WorklogCalendar from '@/components/WorklogCalendar'
 import WorklogTable from '@/components/WorklogTable'
 import WorklogStats from '@/components/WorklogStats'
-import DashboardLayout from '@/components/DashboardLayout'
+import DashboardLayout from '@/components/layout/DashboardLayout'
 import ExportModal from '@/components/ExportModal'
 import PDFExportService from '@/lib/pdfExportService'
 
@@ -68,7 +68,7 @@ export default function WorklogsPage() {
 
         const worklogData = await jiraApi.getWorklogs(startDate, endDate)
 
-        console.log('Received worklogs:', worklogData.length)
+        // console.log('Received worklogs:', worklogData.length)
         setWorklogs(worklogData)
       } catch (error) {
         console.error('Error fetching worklogs:', error)
@@ -126,7 +126,7 @@ export default function WorklogsPage() {
   }) => {
     try {
       const pdfService = new PDFExportService()
-      
+
       // Filter worklogs for the export period
       const filteredWorklogs = worklogs.filter(worklog => {
         const worklogTime = new Date(worklog.started).getTime()
@@ -177,7 +177,7 @@ export default function WorklogsPage() {
       title="Worklog Details"
       subtitle="Detailed view of time tracking and worklog entries"
       actions={
-        <button 
+        <button
           onClick={() => setIsExportModalOpen(true)}
           className="flex items-center px-3 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-sm hover:shadow-md text-sm"
         >

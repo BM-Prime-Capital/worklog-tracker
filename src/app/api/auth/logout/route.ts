@@ -1,15 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
-    const response = NextResponse.json({ message: 'Logged out successfully' })
+    const session = await getServerSession(authOptions as any)
     
-    // Clear the authentication cookie
-    response.cookies.set('token', '', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 0 // Expire immediately
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Not authenticated' },
+        { status: 401 }
+      )
+    }
+
+    // Clear the session cookie
+    const response = NextResponse.json(
+      { message: 'Logged out successfully' },
+      { status: 200 }
+    )
+
+    // Clear the NextAuth session cookie
+    response.cookies.set('next-auth.session-token', '', {
+      expires: new Date(0),
+      path: '/',
+    })
+
+    response.cookies.set('__Secure-next-auth.session-token', '', {
+      expires: new Date(0),
+      path: '/',
+      secure: true,
     })
 
     return response

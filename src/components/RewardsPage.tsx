@@ -14,7 +14,7 @@ import {
   Sparkles,
   Heart
 } from 'lucide-react'
-import DashboardLayout from './DashboardLayout'
+import DashboardLayout from './layout/DashboardLayout'
 import { useAuth } from '@/contexts/AuthContextNew'
 import { jiraApiEnhanced as jiraApi } from '@/lib/jiraApiEnhanced'
 import { format, startOfWeek, endOfWeek } from 'date-fns'

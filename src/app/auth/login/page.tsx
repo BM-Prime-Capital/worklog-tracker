@@ -1,15 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Eye, EyeOff, Mail, Lock, ArrowRight, AlertCircle, Building2, Users, BarChart3 } from 'lucide-react'
-import { useAuth } from '@/contexts/AuthContextNew'
+import { signIn, useSession } from 'next-auth/react'
 import { loginSchema } from '@/lib/validation'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { login } = useAuth()
+  const { data: session, status } = useSession()
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -17,6 +17,32 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user) {
+      // Check if user has organization - redirect to onboarding if not
+      const user = session.user as { organizationId?: string; role: string }
+      if (!user.organizationId) {
+        router.push('/onboarding/organization')
+      } else {
+        const dashboardPath = `/dashboard/${user.role.toLowerCase()}`
+        router.push(dashboardPath)
+      }
+    }
+  }, [status, session, router])
+
+  // Show loading while redirecting authenticated users
+  if (status === 'authenticated' && session?.user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Redirecting...</p>
+        </div>
+      </div>
+    )
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -34,9 +60,9 @@ export default function LoginPage() {
       return true
     } catch (error: unknown) {
       const newErrors: Record<string, string> = {}
-      if (error && typeof error === 'object' && 'errors' in error) {
-        const validationError = error as { errors: Array<{ path: string[], message: string }> }
-        validationError.errors.forEach((err) => {
+      if (error && typeof error === 'object' && 'issues' in error) {
+        const zodError = error as { issues: Array<{ path: string[]; message: string }> }
+        zodError.issues.forEach((err) => {
           newErrors[err.path[0]] = err.message
         })
       }
@@ -53,15 +79,35 @@ export default function LoginPage() {
     setIsLoading(true)
     setErrors({})
 
-    const result = await login(formData.email, formData.password)
+    try {
+      const result = await signIn('credentials', {
+        email: formData.email,
+        password: formData.password,
+        redirect: false,
+      })
 
-    if (result.success) {
-      router.push('/dashboard')
-    } else {
-      setErrors({ submit: result.error || 'Login failed' })
+      if (result?.error) {
+        setErrors({ submit: result.error })
+      } else if (result?.ok) {
+        // Redirect will be handled by the middleware or session callback
+        router.push('/dashboard')
+      }
+    } catch {
+      setErrors({ submit: 'An unexpected error occurred' })
+    } finally {
+      setIsLoading(false)
     }
+  }
 
-    setIsLoading(false)
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -246,7 +292,10 @@ export default function LoginPage() {
             {/* Footer */}
             <div className="mt-6 text-center">
               <p className="text-gray-600 text-sm">
-                Need access? Contact your system administrator
+                Don&apos;t have an account?{' '}
+                <Link href="/auth/signup" className="text-blue-600 hover:text-blue-700 font-medium">
+                  Sign up
+                </Link>
               </p>
             </div>
           </div>

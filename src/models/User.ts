@@ -7,6 +7,8 @@ export interface IUser extends Document {
   firstName: string
   lastName: string
   isEmailVerified: boolean
+  role: 'MANAGER' | 'DEVELOPER'
+  organizationId?: string // Added organizationId field
   emailVerificationToken?: string
   emailVerificationExpires?: Date
   resetPasswordToken?: string
@@ -48,6 +50,17 @@ const userSchema = new Schema<IUser>({
   isEmailVerified: {
     type: Boolean,
     default: false
+  },
+  role: {
+    type: String,
+    enum: ['MANAGER', 'DEVELOPER'],
+    default: 'DEVELOPER',
+    required: true
+  },
+  organizationId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Organization',
+    required: false // Will be set during onboarding or invitation
   },
   emailVerificationToken: String,
   emailVerificationExpires: Date,
@@ -92,4 +105,4 @@ userSchema.methods.toJSON = function() {
   return user
 }
 
-export default mongoose.models.User || mongoose.model<IUser>('User', userSchema) 
+export default mongoose.models.User || mongoose.model<IUser>('User', userSchema)

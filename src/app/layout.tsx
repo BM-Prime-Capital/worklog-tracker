@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContextNew";
+import NextAuthProvider from "@/components/providers/NextAuthProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Developer Worklog Dashboard",
-  description: "Track developer productivity and work hours from Jira tasks",
+  title: "Worklog Tracker - Project Management System",
+  description: "Comprehensive project management system with Jira integration, role-based access control, and team productivity tracking",
   icons: {
     icon: "/favicon.ico",
   },
@@ -31,9 +32,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+        <NextAuthProvider>
+          <AuthProvider>
+            {children}
+          </AuthProvider>
+        </NextAuthProvider>
       </body>
     </html>
   );

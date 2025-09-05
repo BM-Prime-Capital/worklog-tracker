@@ -60,7 +60,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (result?.ok) {
         // Redirect based on user role
-        if (session?.user?.role === 'MANAGER') {
+        const user = session?.user as { role?: 'ADMIN' | 'MANAGER' | 'DEVELOPER' }
+        if (user?.role === 'MANAGER') {
           router.push('/dashboard/manager')
         } else {
           router.push('/dashboard/developer')
@@ -137,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const value: AuthContextType = {
-    user: session?.user || null,
+    user: session?.user ? session.user as User : null,
     isLoading,
     isAuthenticated: !!session?.user,
     login,

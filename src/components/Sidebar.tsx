@@ -1,81 +1,232 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { 
-  LayoutDashboard, 
-  Calendar, 
-  Users, 
-  User, 
-  Trophy, 
   LogOut, 
   ChevronLeft, 
   ChevronRight,
-  BarChart3,
-  FileText,
-  Clock,
-  FolderOpen
+  Clock
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContextNew'
+import { UserRole } from '@/lib/types'
+
+interface NavigationItem {
+  name: string
+  href: string
+  icon: React.ComponentType<{ className?: string }>
+  description: string
+}
 
 interface SidebarProps {
   isCollapsed: boolean
   onToggle: () => void
+  getNavigationItems: (role: UserRole) => NavigationItem[]
 }
 
-export default function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
+export default function Sidebar({ isCollapsed, onToggle, getNavigationItems }: SidebarProps) {
   const pathname = usePathname()
   const { user, logout } = useAuth()
 
-  const navigationItems = [
-    {
-      name: 'Dashboard',
-      href: '/dashboard',
-      icon: LayoutDashboard,
-      description: 'Overview and analytics'
-    },
-    {
-      name: 'Projects',
-      href: '/projects',
-      icon: FolderOpen,
-      description: 'Project management'
-    },
-    {
-      name: 'Worklogs',
-      href: '/worklogs',
-      icon: Calendar,
-      description: 'Detailed time tracking'
-    },
-    {
-      name: 'Team',
-      href: '/team',
-      icon: Users,
-      description: 'Team management'
-    },
-    {
-      name: 'Rewards',
-      href: '/rewards',
-      icon: Trophy,
-      description: 'Performance rewards'
-    },
-    {
-      name: 'Profile',
-      href: '/profile',
-      icon: User,
-      description: 'Account settings'
-    }
-  ]
+  // const navigationItems = [
+  //   {
+  //     name: 'Dashboard',
+  //     href: '/dashboard',
+  //     icon: LayoutDashboard,
+  //     description: 'Overview and analytics'
+  //   },
+  //   {
+  //     name: 'Projects',
+  //     href: '/projects',
+  //     icon: FolderOpen,
+  //     description: 'Project management'
+  //   },
+  //   {
+  //     name: 'Worklogs',
+  //     href: '/worklogs',
+  //     icon: Calendar,
+  //     description: 'Detailed time tracking'
+  //   },
+  //   {
+  //     name: 'Team',
+  //     href: '/team',
+  //     icon: Users,
+  //     description: 'Team management'
+  //   },
+  //   {
+  //     name: 'Rewards',
+  //     href: '/rewards',
+  //     icon: Trophy,
+  //     description: 'Performance rewards'
+  //   },
+  //   {
+  //     name: 'Profile',
+  //     href: '/profile',
+  //     icon: User,
+  //     description: 'Account settings'
+  //   }
+  // ]
+
+   // Navigation items based on role
+  //  const getNavigationItems = (role:UserRole) => {
+
+  //   const baseItems = [
+  //     {
+  //       name: "Dashboard",
+  //       href: `/dashboard/${role.toLowerCase()}`,
+  //     icon: LayoutDashboard,
+  //     description: 'Overview and analytics'
+  //     },
+  //     {
+  //       name: "Rewards",
+  //       href: `/rewards/${role.toLowerCase()}`,
+  //     icon: Trophy,
+  //     description: 'Performance rewards'
+  //     },
+  //     {
+  //       name: "Profile",
+  //       href: `/profile/${role.toLowerCase()}`,
+  //     icon: User,
+  //     description: 'Account settings'
+  //     },
+  //   ];
+
+  //   switch (role) {
+  //     case "MANAGER":
+  //       return [
+  //         ...baseItems.slice(0), // Dashboard 
+  //         {
+  //           name: 'Worklogs',
+  //           href: '/worklogs',
+  //           icon: Calendar,
+  //           description: 'Detailed time tracking'
+  //         },
+  //         {
+  //           name: 'Team',
+  //           href: '/team',
+  //           icon: Users,
+  //           description: 'Team management'
+  //         },
+
+          
+  //         ...baseItems.slice(2), //  Reward + Profile
+  //       ];
+
+  //       case "DEVELOPER":
+  //         return [
+  //           ...baseItems.slice(0, 1), //Dashboard
+  //           { 
+  //             name: 'My Tasks', 
+  //             href: '/dashboard/developer/tasks', 
+  //             icon: CheckCircle 
+  //           },
+  //           { 
+  //             name: 'My Worklogs', 
+  //             href: '/dashboard/developer/worklogs', 
+  //             icon: Clock 
+  //           },
+  //           { 
+  //             name: 'Projects', 
+  //             href: '/dashboard/developer/projects', 
+  //             icon: Code 
+  //           },
+  //           {
+  //              name: 'Reports', 
+  //              href: '/dashboard/developer/reports', 
+  //              icon: BarChart3 },
+  //           { 
+  //             name: 'Settings', 
+  //             href: '/dashboard/developer/settings', 
+  //             icon: Settings 
+  //           },
+  //           ...baseItems.slice(2), //  Reward + Profile
+
+  //         ];
+       
+  //         return [
+  //           {
+  //             name: "Dashboard",
+  //             href: `/dashboard/${role.toLowerCase()}`,
+  //             icon: LayoutDashboard,
+  //             badge: null,
+  //           },
+  //           // {
+  //           //   name: "Messages",
+  //           //   href: `/dashboard/${role.toLowerCase()}/messages`,
+  //           //   icon: MessageSquare,
+  //           //   badge: null,
+  //           // },
+  //           {
+  //             name: "Bookings",
+  //             href: `/dashboard/${role.toLowerCase()}/bookings`,
+  //             icon: ClipboardCheck,
+  //             badge: "12",
+  //           },
+  //           {
+  //             name: "Services",
+  //             href: `/dashboard/${role.toLowerCase()}/services`,
+  //             icon: Wrench,
+  //             badge: null,
+  //           },
+  //           {
+  //             name: "Add-ons",
+  //             href: `/dashboard/${role.toLowerCase()}/addons`,
+  //             icon: Plus,
+  //             badge: null,
+  //           },
+  //           {
+  //             name: "Inventory",
+  //             href: `/dashboard/${role.toLowerCase()}/inventory`,
+  //             icon: Package,
+  //             badge: null,
+  //           },
+  //           {
+  //             name: "Settings",
+  //             href: `/dashboard/${role.toLowerCase()}/settings`,
+  //             icon: Sliders,
+  //             badge: null,
+  //           },
+  //         ];
+
+  //     default:
+  //       return baseItems;
+  //   }
+
+  //   // if (isManager) {
+  //   //   return [
+  //   //     { name: 'Dashboard', href: '/dashboard/manager/projects', icon: FolderOpen },
+  //   //     { name: 'Team', href: '/dashboard/manager/team', icon: Users },
+  //   //     { name: 'Worklogs', href: '/dashboard/manager/worklogs', icon: Activity },
+  //   //     { name: 'Reports', href: '/dashboard/manager/reports', icon: BarChart3 },
+  //   //     { name: 'Settings', href: '/dashboard/manager/settings', icon: Settings },
+  //   //   ]
+  //   // } else if (isDeveloper) {
+  //   //   return [
+  //   //     { name: 'My Tasks', href: '/dashboard/developer/tasks', icon: CheckCircle },
+  //   //     { name: 'My Worklogs', href: '/dashboard/developer/worklogs', icon: Clock },
+  //   //     { name: 'Projects', href: '/dashboard/developer/projects', icon: Code },
+  //   //     { name: 'Reports', href: '/dashboard/developer/reports', icon: BarChart3 },
+  //   //     { name: 'Settings', href: '/dashboard/developer/settings', icon: Settings },
+  //   //   ]
+  //   // }
+  //   // return []
+  // }
+
+  const navigationItems = user ? getNavigationItems(user.role) : [];
 
   const handleLogout = () => {
     logout()
   }
 
   const isActive = (href: string) => {
-    if (href === '/dashboard') {
-      return pathname === '/dashboard'
-    }
-    return pathname.startsWith(href)
+    const isExactMatch = pathname === href;
+          const isSubpage = href !== `/dashboard/${user?.role?.toLowerCase()}` && 
+                           pathname.startsWith(href + '/');
+          return isExactMatch || isSubpage;
+    // if (href === '/dashboard') {
+    //   return pathname === '/dashboard'
+    // }
+    // return pathname.startsWith(href)
   }
 
   return (
@@ -89,7 +240,7 @@ export default function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
             <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
               <Clock className="w-5 h-5 text-white" />
             </div>
-            <span className="text-lg font-semibold text-gray-900">Worklog</span>
+            <span className="text-lg font-semibold text-gray-900">Worklog Tracker</span>
           </div>
         )}
         <button
@@ -104,24 +255,7 @@ export default function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
         </button>
       </div>
 
-      {/* User Info */}
-      {!isCollapsed && user && (
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-              <span className="text-sm font-medium text-white">
-                {user.firstName?.charAt(0) || 'U'}{user.lastName?.charAt(0) || ''}
-              </span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
-                {user.firstName || 'User'} {user.lastName || ''}
-              </p>
-              <p className="text-xs text-gray-500 truncate">{user.email || 'No email'}</p>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Navigation */}
       <nav className="p-4 space-y-2 pb-20">

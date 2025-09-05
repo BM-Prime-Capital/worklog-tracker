@@ -13,10 +13,10 @@ import {
   FileText,
   Tag,
   Mail,
-  Download,
-  Eye
+
 } from 'lucide-react'
 import { JiraWorklog } from '@/lib/jiraApiEnhanced'
+import { formatTimeFromSeconds } from '@/lib/timeUtils'
 
 interface WorklogDetailsModalProps {
   worklog: JiraWorklog | null
@@ -50,10 +50,7 @@ export default function WorklogDetailsModal({ worklog, isOpen, onClose }: Worklo
     return null
   }
 
-  const formatHours = (seconds: number) => {
-    const hours = seconds / 3600
-    return `${Math.round(hours * 100) / 100}h`
-  }
+  // Using formatTimeFromSeconds from timeUtils for better UX
 
   const formatDate = (dateString: string) => {
     return format(new Date(dateString), 'EEEE, MMMM d, yyyy')
@@ -595,7 +592,7 @@ export default function WorklogDetailsModal({ worklog, isOpen, onClose }: Worklo
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-900">Time Spent</p>
-                      <p className="text-lg font-semibold text-blue-600">{formatHours(worklog.timeSpentSeconds)}</p>
+                      <p className="text-lg font-semibold text-blue-600">{formatTimeFromSeconds(worklog.timeSpentSeconds)}</p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3">

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Clock, User, Calendar, TrendingUp, Filter, ChevronDown, ChevronUp } from 'lucide-react'
 import { Developer } from '@/lib/types'
+import { formatTimeFromHours } from '@/lib/timeUtils'
 
 interface ProjectWorklogsProps {
   developers: Developer[]
@@ -85,9 +86,7 @@ export default function ProjectWorklogs({ developers, isLoading }: ProjectWorklo
     setExpandedProjects(newExpanded)
   }
 
-  const formatHours = (hours: number) => {
-    return `${Math.round(hours * 100) / 100}h`
-  }
+  // Using formatTimeFromHours from timeUtils for better UX
 
   const getProductivityColor = (hours: number) => {
     if (hours >= 40) return 'text-green-600'
@@ -162,13 +161,13 @@ export default function ProjectWorklogs({ developers, isLoading }: ProjectWorklo
                       <div>
                         <h3 className="font-semibold text-gray-900">{project.projectName}</h3>
                         <p className="text-sm text-gray-600">
-                          {project.developers.length} developer{project.developers.length !== 1 ? 's' : ''} • {formatHours(project.totalHours)} total
+                          {project.developers.length} developer{project.developers.length !== 1 ? 's' : ''} • {formatTimeFromHours(project.totalHours)} total
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
                       <span className="text-sm font-medium text-gray-900">
-                        {formatHours(project.totalHours)}
+                        {formatTimeFromHours(project.totalHours)}
                       </span>
                       {isExpanded ? (
                         <ChevronUp className="w-4 h-4 text-gray-500" />
@@ -198,7 +197,7 @@ export default function ProjectWorklogs({ developers, isLoading }: ProjectWorklo
                           </div>
                           <div className="flex items-center space-x-2">
                             <span className={`font-semibold ${getProductivityColor(developer.hours)}`}>
-                              {formatHours(developer.hours)}
+                              {formatTimeFromHours(developer.hours)}
                             </span>
                             <TrendingUp className="w-4 h-4 text-green-500" />
                           </div>
@@ -225,7 +224,7 @@ export default function ProjectWorklogs({ developers, isLoading }: ProjectWorklo
             </div>
             <div>
               <p className="text-2xl font-bold text-blue-600">
-                {formatHours(filteredProjects.reduce((sum, p) => sum + p.totalHours, 0))}
+                {formatTimeFromHours(filteredProjects.reduce((sum, p) => sum + p.totalHours, 0))}
               </p>
               <p className="text-sm text-gray-600">Total Hours</p>
             </div>

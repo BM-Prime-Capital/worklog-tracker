@@ -16,9 +16,10 @@ interface SessionWithUser {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function PUT(request: NextRequest) {
   try {
     // Get session using NextAuth
+    // @ts-ignore - NextAuth.js v4 type compatibility issue
     const session = await getServerSession(authOptions as any)
 
     if (!session || !(session as SessionWithUser).user) {
@@ -31,24 +32,21 @@ export async function POST(request: NextRequest) {
     await dbConnect()
 
     // Get request body
-    const { domain, email, apiToken } = await request.json()
+    const { firstName, lastName } = await request.json()
 
-    if (!domain || !email || !apiToken) {
+    if (!firstName || !lastName) {
       return NextResponse.json(
-        { error: 'Missing required fields: domain, email, apiToken' },
+        { error: 'Missing required fields: firstName, lastName' },
         { status: 400 }
       )
     }
 
-    // Update user's Jira organization
+    // Update user's profile information
     const updatedUser = await User.findByIdAndUpdate(
       (session as SessionWithUser).user.id,
       {
-        jiraOrganization: {
-          domain,
-          email,
-          apiToken
-        }
+        firstName,
+        lastName
       },
       { new: true, select: '-password' }
     )
@@ -62,22 +60,23 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Jira organization updated successfully',
+      message: 'Profile updated successfully',
       user: {
         id: updatedUser._id,
         email: updatedUser.email,
         firstName: updatedUser.firstName,
         lastName: updatedUser.lastName,
         role: updatedUser.role,
+        isEmailVerified: updatedUser.isEmailVerified,
         jiraOrganization: updatedUser.jiraOrganization
       }
     })
 
   } catch (error) {
-    console.error('Jira organization update error:', error)
+    console.error('Profile update error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     )
   }
-} 
+}

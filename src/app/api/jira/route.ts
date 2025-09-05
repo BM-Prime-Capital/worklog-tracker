@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
             maxResults: 0
           }
         })
-        console.log(`Jira API get-project-issue-count response for ${projectKey}:`, response.data)
+        // console.log(`Jira API get-project-issue-count response for ${projectKey}:`, response.data)
         return NextResponse.json({ total: response.data.total })
 
       case 'get-project-done-issues-count':
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
             maxResults: 0
           }
         })
-        console.log(`Jira API get-project-done-issues-count response for ${doneProjectKey}:`, response.data)
+        // console.log(`Jira API get-project-done-issues-count response for ${doneProjectKey}:`, response.data)
         return NextResponse.json({ total: response.data.total })
 
       case 'get-project-stats':
@@ -135,11 +135,11 @@ export async function POST(request: NextRequest) {
         const doneIssues = doneResponse.data.total || 0
         const progressPercentage = totalIssues > 0 ? Math.round((doneIssues / totalIssues) * 100) : 0
 
-        console.log(`Jira API get-project-stats response for ${statsProjectKey}:`, {
-          totalIssues,
-          doneIssues,
-          progressPercentage
-        })
+        // console.log(`Jira API get-project-stats response for ${statsProjectKey}:`, {
+        //   totalIssues,
+        //   doneIssues,
+        //   progressPercentage
+        // })
 
         return NextResponse.json({
           totalIssues,
@@ -213,7 +213,7 @@ function extractWorklogs(issues: unknown[], startDate: string, endDate: string) 
 
             // Check for attachments in the worklog itself
             if (worklog && typeof worklog === 'object' && 'attachment' in worklog && worklog.attachment) {
-              console.log('Found worklog attachment:', worklog.attachment)
+              // console.log('Found worklog attachment:', worklog.attachment)
               if (Array.isArray(worklog.attachment)) {
                 worklog.attachment.forEach((att: unknown) => {
                   if (att && typeof att === 'object' && 'id' in att) {
@@ -259,8 +259,8 @@ function extractWorklogs(issues: unknown[], startDate: string, endDate: string) 
               console.log('No comment found in worklog')
             }
 
-            console.log('Final comment text:', commentText)
-            console.log('Final attachments:', attachments)
+            // console.log('Final comment text:', commentText)
+            // console.log('Final attachments:', attachments)
 
             worklogs.push({
               ...worklog,
@@ -341,7 +341,7 @@ function extractAttachmentsFromContent(content: unknown[]): unknown[] {
       if ('type' in node && typeof (node as { type: string }).type === 'string') {
         const nodeType = (node as { type: string }).type
         if (nodeType === 'media' || nodeType === 'mediaGroup') {
-          console.log('Found embedded media:', node)
+          // console.log('Found embedded media:', node)
           attachments.push({
             type: 'embedded-media',
             data: node

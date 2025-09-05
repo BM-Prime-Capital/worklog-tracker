@@ -1,47 +1,46 @@
-import { NextRequest, NextResponse } from 'next/server'
-import dbConnect from '@/lib/db'
-import User from '@/models/User'
-import { verifyToken } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
 
-export async function GET(request: NextRequest) {
+interface SessionWithUser {
+  user: {
+    id: string
+    email: string
+    firstName: string
+    lastName: string
+    role: string
+    isEmailVerified: boolean
+    organizationId?: string
+    jiraOrganization?: {
+      domain: string
+      email: string
+      apiToken: string
+    }
+  }
+}
+
+export async function GET() {
   try {
-    await dbConnect()
+    // Get session using NextAuth
+    const session = await getServerSession(authOptions as any)
 
-    // Get token from cookies
-    const token = request.cookies.get('token')?.value
-
-    if (!token) {
+    if (!session || !(session as SessionWithUser).user) {
       return NextResponse.json(
-        { error: 'No token provided' },
+        { error: 'Not authenticated' },
         { status: 401 }
       )
     }
 
-    // Verify token
-    const decoded = verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json(
-        { error: 'Invalid token' },
-        { status: 401 }
-      )
-    }
-
-    // Find user
-    const user = await User.findById(decoded.userId).select('-password')
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
-    }
-
+    // Return user information from session
+    const user = (session as SessionWithUser).user
     return NextResponse.json({
       user: {
-        id: user._id,
+        id: user.id,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
         isEmailVerified: user.isEmailVerified,
+        role: user.role,
         jiraOrganization: user.jiraOrganization
       }
     })

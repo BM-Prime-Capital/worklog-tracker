@@ -320,7 +320,7 @@ class JiraApiService {
       }
 
       const data = await response.json()
-      console.log('Jira API getIssues response:', data)
+      // console.log('Jira API getIssues response:', data)
       return data.issues || []
     } catch (error) {
       console.error('Error fetching issues:', error)
@@ -350,7 +350,7 @@ class JiraApiService {
       }
 
       const data = await response.json()
-      console.log('Jira API getRecentIssues response:', data)
+      // console.log('Jira API getRecentIssues response:', data)
       return data.issues || []
     } catch (error) {
       console.error('Error fetching recent issues:', error)
@@ -380,7 +380,7 @@ class JiraApiService {
       }
 
       const data = await response.json()
-      console.log(`Jira API getProjectIssueCount response for ${projectKey}:`, data)
+      // console.log(`Jira API getProjectIssueCount response for ${projectKey}:`, data)
       return data.total || 0
     } catch (error) {
       console.error(`Error fetching issue count for project ${projectKey}:`, error)
@@ -410,7 +410,7 @@ class JiraApiService {
       }
 
       const data = await response.json()
-      console.log(`Jira API getProjectDoneIssuesCount response for ${projectKey}:`, data)
+      // console.log(`Jira API getProjectDoneIssuesCount response for ${projectKey}:`, data)
       return data.total || 0
     } catch (error) {
       console.error(`Error fetching done issues count for project ${projectKey}:`, error)
@@ -444,7 +444,7 @@ class JiraApiService {
       }
 
       const data = await response.json()
-      console.log(`Jira API getProjectStats response for ${projectKey}:`, data)
+      // console.log(`Jira API getProjectStats response for ${projectKey}:`, data)
       return {
         totalIssues: data.totalIssues || 0,
         doneIssues: data.doneIssues || 0,
@@ -477,18 +477,18 @@ class JiraApiService {
       status: 'online' | 'offline'
       worklogs: JiraWorklog[]
     }>()
-    
+
     const teamHours = new Map<string, number>()
     const issueDetails = new Map<string, { summary: string; status: string }>()
-    
+
     // Process each worklog entry
     worklogs.forEach(worklog => {
       const author = worklog.author.displayName
       const authorEmail = worklog.author.emailAddress
       const hours = worklog.timeSpentSeconds / 3600
 
-      console.log("Worklog ===>", worklog)
-      
+      // console.log("Worklog ===>", worklog)
+
       // Store issue details for reference
       if (!issueDetails.has(worklog.issueKey)) {
         issueDetails.set(worklog.issueKey, {
@@ -496,7 +496,7 @@ class JiraApiService {
           status: 'In Progress' // Default status, could be enhanced with actual issue status
         })
       }
-      
+
       // Aggregate by developer
       if (!developers.has(author)) {
         developers.set(author, {
@@ -515,30 +515,30 @@ class JiraApiService {
           worklogs: []
         })
       }
-      
+
       const dev = developers.get(author)!
       dev.hours += hours
       dev.tasks.add(worklog.issueKey)
       dev.worklogs.push(worklog)
-      
+
       // Update last active time
       const worklogDate = new Date(worklog.started)
       const lastActiveDate = new Date(dev.lastActive)
       if (worklogDate > lastActiveDate) {
         dev.lastActive = worklog.started
       }
-      
+
       // Aggregate by team
       const team = dev.team
       teamHours.set(team, (teamHours.get(team) || 0) + hours)
     })
-    
+
     // Calculate additional metrics and convert to array
     const developersArray: DeveloperData[] = Array.from(developers.values()).map(dev => {
       // Calculate productivity based on hours worked vs expected (40 hours/week)
       const expectedHours = 40 // Could be configurable per developer
       const productivity = Math.min(100, Math.max(0, (dev.hours / expectedHours) * 100))
-      
+
       // Determine trend based on recent activity
       const recentWorklogs = dev.worklogs
         .filter(w => {
@@ -547,22 +547,22 @@ class JiraApiService {
           return worklogDate > weekAgo
         })
         .sort((a, b) => new Date(b.started).getTime() - new Date(a.started).getTime())
-      
+
       let trend: 'up' | 'down' | 'stable' = 'stable'
       if (recentWorklogs.length >= 2) {
         const recentHours = recentWorklogs.slice(0, 3).reduce((sum, w) => sum + (w.timeSpentSeconds / 3600), 0)
         const olderHours = recentWorklogs.slice(3, 6).reduce((sum, w) => sum + (w.timeSpentSeconds / 3600), 0)
-        
+
         if (recentHours > olderHours * 1.1) trend = 'up'
         else if (recentHours < olderHours * 0.9) trend = 'down'
       }
-      
+
       // Determine status based on last activity
       const lastActiveDate = new Date(dev.lastActive)
       const now = new Date()
       const hoursSinceLastActive = (now.getTime() - lastActiveDate.getTime()) / (1000 * 60 * 60)
       const status: 'online' | 'offline' = hoursSinceLastActive < 4 ? 'online' : 'offline'
-      
+
       return {
         id: dev.id,
         name: dev.name,
@@ -579,10 +579,10 @@ class JiraApiService {
         worklogs: dev.worklogs
       }
     })
-    
+
     // Sort developers by hours worked (descending)
     developersArray.sort((a, b) => b.hours - a.hours)
-    
+
     return {
       developers: developersArray,
       teamHours: Object.fromEntries(teamHours),
@@ -595,13 +595,13 @@ class JiraApiService {
     const date = new Date(dateString)
     const now = new Date()
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
-    
+
     if (diffInHours < 1) return 'Just now'
     if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`
-    
+
     const diffInDays = Math.floor(diffInHours / 24)
     if (diffInDays < 7) return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`
-    
+
     return date.toLocaleDateString()
   }
 
@@ -658,4 +658,4 @@ class JiraApiService {
   }
 }
 
-export const jiraApiEnhanced = new JiraApiService() 
+export const jiraApiEnhanced = new JiraApiService()

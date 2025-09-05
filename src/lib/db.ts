@@ -1,10 +1,13 @@
 import mongoose from 'mongoose'
 
-const MONGODB_URI = process.env.MONGODB_URI ||"mongodb+srv://murdochkhallz:I87dfwEfJmqLis87@cluster0.sgahquk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0" ||'mongodb://localhost:27017/worklog-tracker'
+const MONGODB_URI = process.env.MONGODB_URI
 
 if (!MONGODB_URI) {
   throw new Error('Please define the MONGODB_URI environment variable inside .env.local')
 }
+
+// At this point, MONGODB_URI is guaranteed to be a string
+const mongoUri: string = MONGODB_URI
 
 interface MongooseCache {
   conn: typeof mongoose | null
@@ -31,7 +34,7 @@ async function dbConnect() {
       bufferCommands: false,
     }
 
-    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
+    cached.promise = mongoose.connect(mongoUri, opts).then((mongoose) => {
       return mongoose
     })
   }
@@ -46,4 +49,4 @@ async function dbConnect() {
   return cached.conn
 }
 
-export default dbConnect 
+export default dbConnect

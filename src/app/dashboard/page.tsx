@@ -1,35 +1,35 @@
 'use client'
 
-import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/contexts/AuthContextNew'
-import Dashboard from '@/components/Dashboard'
+import { useSession } from 'next-auth/react'
+import { useEffect } from 'react'
+import ProtectedRoute from '@/components/auth/ProtectedRoute'
 
-export default function DashboardPage() {
-  const { user, isLoading, isAuthenticated } = useAuth()
+const DashboardRedirectingPage = () => {
+  const { data: session } = useSession()
   const router = useRouter()
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/auth/login')
+    if (session?.user) {
+      // Redirect to role-specific dashboard
+      const user = session.user as { role: 'ADMIN' | 'MANAGER' | 'DEVELOPER' }
+      const dashboardRoute = `/dashboard/${user.role.toLowerCase()}`
+      router.push(dashboardRoute)
     }
-  }, [isLoading, isAuthenticated, router])
+  }, [session, router])
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+  return (
+    <ProtectedRoute>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+          <p className="mt-4 text-gray-600">
+            Redirecting to your dashboard...
+          </p>
         </div>
       </div>
-    )
-  }
-
-
-  if (!isAuthenticated) {
-    return null // Will redirect to log in
-  }
-
-  return <Dashboard />
+    </ProtectedRoute>
+  )
 }
+
+  export default DashboardRedirectingPage;

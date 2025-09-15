@@ -19,6 +19,7 @@ import { useAuth } from '@/contexts/AuthContextNew'
 import { jiraApiEnhanced as jiraApi } from '@/lib/jiraApiEnhanced'
 import { format, startOfWeek, endOfWeek } from 'date-fns'
 import { Developer } from '@/lib/types'
+import { formatTimeFromHours } from '@/lib/timeUtils'
 
 interface RankedDeveloper extends Developer {
   rank: number
@@ -268,7 +269,7 @@ export default function RewardsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-yellow-100 text-sm font-medium">Total Hours</p>
-                    <p className="text-3xl font-bold">{weeklyStats.totalHours.toFixed(1)}</p>
+                    <p className="text-3xl font-bold">{formatTimeFromHours(weeklyStats.totalHours)}</p>
                   </div>
                   <Clock className="w-8 h-8 text-yellow-100" />
                 </div>
@@ -278,7 +279,7 @@ export default function RewardsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-blue-100 text-sm font-medium">Average Hours</p>
-                    <p className="text-3xl font-bold">{weeklyStats.averageHours.toFixed(1)}</p>
+                    <p className="text-3xl font-bold">{formatTimeFromHours(weeklyStats.averageHours)}</p>
                   </div>
                   <Users className="w-8 h-8 text-blue-100" />
                 </div>
@@ -353,7 +354,7 @@ export default function RewardsPage() {
 
                       <div className="flex items-center space-x-6">
                         <div className="text-right">
-                          <p className="text-2xl font-bold text-gray-900">{developer.hours}h</p>
+                          <p className="text-2xl font-bold text-gray-900">{formatTimeFromHours(developer.hours)}</p>
                           <p className="text-sm text-gray-500">{developer.tasks} tasks</p>
                         </div>
 

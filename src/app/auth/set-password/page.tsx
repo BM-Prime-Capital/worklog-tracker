@@ -213,7 +213,7 @@ function SetPasswordContent() {
 
         {/* Footer */}
         <div className="text-blue-100 text-sm">
-          <p>&copy; 2025 BM Prime Capital. All rights reserved.</p>
+          <p>&copy; 2025 Company. All rights reserved.</p>
         </div>
       </div>
 

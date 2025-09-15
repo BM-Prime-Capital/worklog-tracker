@@ -11,14 +11,49 @@ interface JiraOrganization {
   apiToken: string
 }
 
+interface Organization {
+  id: string
+  name: string
+  slug: string
+  description?: string
+  domain?: string
+  email?: string
+  settings: {
+    timezone: string
+    workingDays: string[]
+    workingHours: {
+      start: string
+      end: string
+    }
+  }
+  subscription: {
+    plan: 'free' | 'pro' | 'enterprise'
+    status: 'active' | 'inactive' | 'cancelled' | 'trial'
+    maxUsers: number
+  }
+}
+
 interface User {
   id: string
   email: string
   firstName: string
   lastName: string
-  role: 'MANAGER' | 'DEVELOPER'
+  role: 'MANAGER' | 'DEVELOPER' | 'ADMIN'
   isEmailVerified: boolean
+  organizationId?: string
+  organization?: Organization
   jiraOrganization?: JiraOrganization
+  atlassianAccountId?: string
+  atlassianEmail?: string
+  atlassianDisplayName?: string
+  atlassianAvatarUrl?: string
+  notificationSettings?: {
+    emailNotifications: boolean
+    worklogReminders: boolean
+    projectUpdates: boolean
+    weeklyReports: boolean
+  }
+  authMethods?: ('password' | 'atlassian')[]
 }
 
 interface AuthContextType {
@@ -29,6 +64,7 @@ interface AuthContextType {
   signup: (email: string, password: string, confirmPassword: string, firstName: string, lastName: string) => Promise<{ success: boolean; error?: string }>
   logout: () => Promise<void>
   updateJiraOrganization: (jiraData: JiraOrganization) => Promise<{ success: boolean; error?: string }>
+  updateUser: (userData: Partial<User>) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -137,6 +173,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const updateUser = (userData: Partial<User>) => {
+    // This is a simple local state update
+    // In a real app, you might want to trigger a session refresh
+    if (session?.user) {
+      // Update the session user data locally
+      Object.assign(session.user, userData)
+    }
+  }
+
   const value: AuthContextType = {
     user: session?.user ? session.user as User : null,
     isLoading,
@@ -145,6 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signup,
     logout,
     updateJiraOrganization,
+    updateUser,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

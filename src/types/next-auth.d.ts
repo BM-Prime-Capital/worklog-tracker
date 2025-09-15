@@ -16,8 +16,9 @@ declare module 'next-auth' {
       lastName: string
       role: 'ADMIN' | 'MANAGER' | 'DEVELOPER'
       isEmailVerified: boolean
-      organizationId?: string // Added organizationId
+      organizationId?: string
       jiraOrganization?: JiraOrganization
+      atlassianAccountId?: string
     }
   }
 
@@ -28,8 +29,9 @@ declare module 'next-auth' {
     lastName: string
     role: 'ADMIN' | 'MANAGER' | 'DEVELOPER'
     isEmailVerified: boolean
-    organizationId?: string // Added organizationId
+    organizationId?: string
     jiraOrganization?: JiraOrganization
+    atlassianAccountId?: string
   }
 }
 
@@ -40,7 +42,8 @@ declare module 'next-auth/jwt' {
     firstName: string
     lastName: string
     isEmailVerified: boolean
-    organizationId?: string // Added organizationId
+    organizationId?: string
     jiraOrganization?: JiraOrganization
+    atlassianAccountId?: string
   }
 }

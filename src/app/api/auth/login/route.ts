@@ -38,9 +38,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Type assertion for _id to handle Mongoose typing
+    const userIdString = (user._id as { toString(): string }).toString()
+
     // Generate JWT token
     const token = generateToken({
-      userId: user._id.toString(),
+      userId: userIdString,
       email: user.email
     })
 
@@ -48,7 +51,7 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({
       message: 'Login successful',
       user: {
-        id: user._id,
+        id: userIdString,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Search, MoreVertical, Loader2 } from 'lucide-react'
 import { Developer } from '@/lib/types'
-import { formatTimeFromHours } from '@/lib/timeUtils'
+import { formatHours } from '@/lib/timeUtils'
 
 interface DeveloperListProps {
   developers: Developer[]
@@ -92,7 +92,7 @@ export default function DeveloperList({ developers, isLoading }: DeveloperListPr
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {formatTimeFromHours(developer.hours)}
+                    {formatHours(developer.hours)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {developer.tasks}

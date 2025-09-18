@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Calendar, Clock, CheckCircle, TrendingUp, Code, Users, Target, Award, AlertCircle } from 'lucide-react'
 import StatsCard from './StatsCard'
 import WeeklyHoursChart from './WeeklyHoursChart'
+import { formatHours } from '@/lib/timeUtils'
 
 interface DeveloperData {
   personal: {
@@ -219,7 +220,7 @@ export default function DeveloperDashboard({ selectedDateRange = 'this-week' }: 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard
           title="Hours This Week"
-          value={developerData.stats.totalHoursThisWeek.toString()}
+          value={formatHours(developerData.stats.totalHoursThisWeek)}
           change={developerData.stats.hoursChange}
           changeType={developerData.stats.hoursChange.startsWith('+') ? 'positive' : 'negative'}
           icon={Clock}
@@ -286,7 +287,7 @@ export default function DeveloperDashboard({ selectedDateRange = 'this-week' }: 
                   <div className="grid grid-cols-3 gap-4 text-sm">
                     <div>
                       <p className="text-gray-500">Hours This Week</p>
-                      <p className="font-medium">{project.hoursThisWeek}h</p>
+                      <p className="font-medium">{formatHours(project.hoursThisWeek)}</p>
                     </div>
                     <div>
                       <p className="text-gray-500">Tasks Completed</p>
@@ -329,7 +330,7 @@ export default function DeveloperDashboard({ selectedDateRange = 'this-week' }: 
                       {activity.hours > 0 && (
                         <>
                           <span className="text-xs text-gray-400">•</span>
-                          <span className="text-xs text-gray-500">{activity.hours}h</span>
+                          <span className="text-xs text-gray-500">{formatHours(activity.hours)}</span>
                         </>
                       )}
                     </div>

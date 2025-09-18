@@ -156,6 +156,7 @@ export default function ProjectsPage() {
             const projectObj = project as { id: string; key: string; name: string; [key: string]: unknown }
             try {
               const stats = await jiraApi.getProjectStats(projectObj.key)
+              console.log(`Stats for project ${projectObj.key}:`, stats)
               return {
                 ...projectObj,
                 totalIssues: stats.totalIssues,

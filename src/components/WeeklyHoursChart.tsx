@@ -69,3 +69,10 @@ export default function WeeklyHoursChart({ data, className = '' }: WeeklyHoursCh
 
 
 
+
+
+
+
+
+
+

@@ -18,7 +18,7 @@ import {
 } from 'recharts'
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, subWeeks, isSameDay } from 'date-fns'
 import { Clock, TrendingUp, TrendingDown, Calendar } from 'lucide-react'
-import { formatTimeFromHours } from '@/lib/timeUtils'
+import { formatHours } from '@/lib/timeUtils'
 
 interface WeeklyChartProps {
   developers?: Array<{
@@ -434,7 +434,7 @@ export default function WeeklyChart({ developers = [], isLoading = false, dateRa
             <div>
               <p className="text-sm font-medium text-gray-600">Total Hours</p>
               <p className="text-2xl font-bold text-gray-900">
-                {formatTimeFromHours(dailyData.reduce((sum, day) => sum + day.totalHours, 0))}
+                {formatHours(dailyData.reduce((sum, day) => sum + day.totalHours, 0))}
               </p>
             </div>
             <Clock className="w-8 h-8 text-blue-500" />
@@ -445,7 +445,7 @@ export default function WeeklyChart({ developers = [], isLoading = false, dateRa
             <div>
               <p className="text-sm font-medium text-gray-600">Avg Daily</p>
               <p className="text-2xl font-bold text-gray-900">
-                {formatTimeFromHours(dailyData.reduce((sum, day) => sum + day.totalHours, 0) / Math.max(dailyData.length, 1))}
+                {formatHours(dailyData.reduce((sum, day) => sum + day.totalHours, 0) / Math.max(dailyData.length, 1))}
               </p>
             </div>
             <Calendar className="w-8 h-8 text-green-500" />

@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosResponse } from 'axios'
+import axios, { AxiosInstance } from 'axios'
 import Cookies from 'js-cookie'
 
 export interface JiraCredentials {
@@ -166,6 +166,7 @@ class JiraApiService {
   async testConnection(): Promise<boolean> {
     try {
       const credentials = await this.getCredentials()
+      console.log("Credentials:", credentials)
       if (!credentials) return false
 
       const response = await fetch('/api/jira', {
@@ -220,24 +221,235 @@ class JiraApiService {
     }
 
     try {
-      const response = await fetch('/api/jira', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'get-worklogs',
-          credentials,
-          params: { startDate, endDate, projectKeys }
+      // Check if we're running on the server side
+      const isServer = typeof window === 'undefined'
+      
+      if (isServer) {
+        // Server-side: make direct Jira API calls
+        return await this.getWorklogsDirect(credentials, startDate, endDate, projectKeys)
+      } else {
+        // Client-side: use the API route
+        const response = await fetch('/api/jira', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'get-worklogs',
+            credentials,
+            params: { startDate, endDate, projectKeys }
+          })
         })
-      })
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch worklogs')
+        if (!response.ok) {
+          throw new Error('Failed to fetch worklogs')
+        }
+
+        const data = await response.json()
+        return data.worklogs
       }
-
-      const data = await response.json()
-      return data.worklogs
     } catch (error) {
       console.error('Error fetching worklogs:', error)
+      throw error
+    }
+  }
+
+  private async getWorklogsDirect(
+    credentials: JiraCredentials,
+    startDate: string,
+    endDate: string,
+    projectKeys?: string[]
+  ): Promise<JiraWorklog[]> {
+    try {
+      console.log("getWorklogsDirect called with credentials:")
+      console.log("Domain:", credentials.domain)
+      console.log("Email:", credentials.email)
+      console.log("API Token length:", credentials.apiToken?.length || 0)
+      
+      // Try multiple approaches to get worklogs
+      const worklogs: JiraWorklog[] = []
+      
+      // Approach 1: Try to get worklogs using a simpler JQL query
+      try {
+        let jql = 'updated >= -7d' // Get recently updated issues (shorter timeframe)
+        if (projectKeys && projectKeys.length > 0) {
+          jql += ` AND project IN (${projectKeys.map(key => `"${key}"`).join(', ')})`
+        }
+
+        const url = `https://${credentials.domain}/rest/api/3/search/jql`
+        console.log("Making search request to URL:", url)
+        console.log("JQL query:", jql)
+        console.log("Request params:", {
+          jql,
+          fields: 'key,summary,worklog',
+          maxResults: 100
+        })
+
+        const issuesResponse = await this.api.get(url, {
+          params: {
+            jql,
+            fields: 'key,summary,worklog',
+            maxResults: 100
+          }
+        })
+
+        const issues = issuesResponse.data.issues || []
+        console.log(`Found ${issues.length} issues to check for worklogs`)
+
+        // For each issue, get the worklogs
+        for (const issue of issues) {
+          try {
+            if (issue.fields.worklog && issue.fields.worklog.total > 0) {
+              const worklogUrl = `https://${credentials.domain}/rest/api/3/issue/${issue.id}/worklog`
+              const worklogResponse = await this.api.get(worklogUrl)
+              const issueWorklogs = worklogResponse.data.worklogs || []
+              
+              // Filter worklogs by date range
+              const filteredWorklogs = issueWorklogs.filter((worklog: {
+                started: string;
+                id: string;
+                timeSpentSeconds: number;
+                timeSpent: string;
+                comment?: string;
+                attachments?: unknown[];
+                author: {
+                  accountId: string;
+                  displayName: string;
+                  emailAddress: string;
+                };
+              }) => {
+                const worklogDate = new Date(worklog.started).toISOString().split('T')[0]
+                return worklogDate >= startDate && worklogDate <= endDate
+              })
+
+              // Transform worklogs to our format
+              filteredWorklogs.forEach((worklog: {
+                id: string;
+                timeSpentSeconds: number;
+                timeSpent: string;
+                started: string;
+                comment?: string;
+                attachments?: unknown[];
+                author: {
+                  accountId: string;
+                  displayName: string;
+                  emailAddress: string;
+                };
+              }) => {
+                worklogs.push({
+                  id: worklog.id,
+                  issueId: issue.id,
+                  issueKey: issue.key,
+                  summary: issue.fields.summary,
+                  author: {
+                    accountId: worklog.author.accountId,
+                    displayName: worklog.author.displayName,
+                    emailAddress: worklog.author.emailAddress
+                  },
+                  timeSpentSeconds: worklog.timeSpentSeconds,
+                  timeSpent: worklog.timeSpent,
+                  started: worklog.started,
+                  comment: worklog.comment,
+                  attachments: (worklog.attachments || []) as JiraAttachment[]
+                })
+              })
+            }
+          } catch (issueError) {
+            console.warn(`Error fetching worklogs for issue ${issue.key}:`, issueError)
+            // Continue with other issues even if one fails
+          }
+        }
+      } catch (searchError) {
+        console.warn("Search approach failed, trying fallback method:", searchError)
+        
+        // Approach 2: Fallback - get all issues and check worklogs individually
+        try {
+          const fallbackUrl = `https://${credentials.domain}/rest/api/3/search/jql`
+          const fallbackJql = 'updated >= -30d ORDER BY updated DESC'
+          
+          console.log("Trying fallback approach with JQL:", fallbackJql)
+          
+          const fallbackResponse = await this.api.get(fallbackUrl, {
+            params: {
+              jql: fallbackJql,
+              fields: 'key,summary',
+              maxResults: 50
+            }
+          })
+
+          const fallbackIssues = fallbackResponse.data.issues || []
+          console.log(`Fallback: Found ${fallbackIssues.length} issues to check`)
+
+          for (const issue of fallbackIssues) {
+            try {
+              const worklogUrl = `https://${credentials.domain}/rest/api/3/issue/${issue.id}/worklog`
+              const worklogResponse = await this.api.get(worklogUrl)
+              const issueWorklogs = worklogResponse.data.worklogs || []
+              
+              // Filter worklogs by date range
+              const filteredWorklogs = issueWorklogs.filter((worklog: {
+                started: string;
+                id: string;
+                timeSpentSeconds: number;
+                timeSpent: string;
+                comment?: string;
+                attachments?: unknown[];
+                author: {
+                  accountId: string;
+                  displayName: string;
+                  emailAddress: string;
+                };
+              }) => {
+                const worklogDate = new Date(worklog.started).toISOString().split('T')[0]
+                return worklogDate >= startDate && worklogDate <= endDate
+              })
+
+              // Transform worklogs to our format
+              filteredWorklogs.forEach((worklog: {
+                id: string;
+                timeSpentSeconds: number;
+                timeSpent: string;
+                started: string;
+                comment?: string;
+                attachments?: unknown[];
+                author: {
+                  accountId: string;
+                  displayName: string;
+                  emailAddress: string;
+                };
+              }) => {
+                worklogs.push({
+                  id: worklog.id,
+                  issueId: issue.id,
+                  issueKey: issue.key,
+                  summary: issue.fields.summary,
+                  author: {
+                    accountId: worklog.author.accountId,
+                    displayName: worklog.author.displayName,
+                    emailAddress: worklog.author.emailAddress
+                  },
+                  timeSpentSeconds: worklog.timeSpentSeconds,
+                  timeSpent: worklog.timeSpent,
+                  started: worklog.started,
+                  comment: worklog.comment,
+                  attachments: (worklog.attachments || []) as JiraAttachment[]
+                })
+              })
+            } catch (issueError) {
+              console.warn(`Fallback: Error fetching worklogs for issue ${issue.key}:`, issueError)
+            }
+          }
+        } catch (fallbackError) {
+          console.error("Fallback approach also failed, trying minimal approach:", fallbackError)
+          
+          // Approach 3: Minimal approach - just return empty array to prevent complete failure
+          console.log("All worklog fetching approaches failed, returning empty array")
+          return []
+        }
+      }
+
+      console.log(`Found ${worklogs.length} worklogs in date range`)
+      return worklogs
+    } catch (error) {
+      console.error('Error fetching worklogs directly:', error)
       throw error
     }
   }
@@ -277,23 +489,50 @@ class JiraApiService {
     }
 
     try {
-      const response = await fetch('/api/jira', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'get-projects',
-          credentials
+      // Check if we're running on the server side
+      const isServer = typeof window === 'undefined'
+      
+      if (isServer) {
+        // Server-side: make direct Jira API calls
+        return await this.getProjectsDirect(credentials)
+      } else {
+        // Client-side: use the API route
+        const response = await fetch('/api/jira', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'get-projects',
+            credentials
+          })
         })
-      })
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch projects')
+        if (!response.ok) {
+          throw new Error('Failed to fetch projects')
+        }
+
+        const data = await response.json()
+        return data.projects
       }
-
-      const data = await response.json()
-      return data.projects
     } catch (error) {
       console.error('Error fetching projects:', error)
+      throw error
+    }
+  }
+
+  private async getProjectsDirect(credentials: JiraCredentials): Promise<unknown[]> {
+    try {
+      const url = `https://${credentials.domain}/rest/api/3/project`
+      console.log("Making request to URL:", url)
+
+      const response = await this.api.get(url, {
+        params: {
+          expand: 'description,lead,url,projectKeys'
+        }
+      })
+
+      return response.data || []
+    } catch (error) {
+      console.error('Error fetching projects directly:', error)
       throw error
     }
   }
@@ -305,25 +544,66 @@ class JiraApiService {
     }
 
     try {
-      const response = await fetch('/api/jira', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'get-issues',
-          credentials,
-          params: { projectKeys, maxResults }
+      // Check if we're running on the server side
+      const isServer = typeof window === 'undefined'
+      
+      if (isServer) {
+        // Server-side: make direct Jira API calls
+        return await this.getIssuesDirect(credentials, projectKeys, maxResults)
+      } else {
+        // Client-side: use the API route
+        const response = await fetch('/api/jira', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'get-issues',
+            credentials,
+            params: { projectKeys, maxResults }
+          })
         })
-      })
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch issues')
+        if (!response.ok) {
+          throw new Error('Failed to fetch issues')
+        }
+
+        const data = await response.json()
+        return data.issues || []
       }
-
-      const data = await response.json()
-      // console.log('Jira API getIssues response:', data)
-      return data.issues || []
     } catch (error) {
       console.error('Error fetching issues:', error)
+      throw error
+    }
+  }
+
+  private async getIssuesDirect(credentials: JiraCredentials, projectKeys?: string[], maxResults: number = 50): Promise<unknown[]> {
+    try {
+      // Build JQL query with time restriction to avoid unbounded queries
+      let jql = ''
+      if (projectKeys && projectKeys.length > 0) {
+        const projectClause = projectKeys.map(key => `project = "${key}"`).join(' OR ')
+        jql = `(${projectClause}) ORDER BY updated DESC`
+      } else {
+        // Add time restriction to avoid unbounded queries
+        const sixMonthsAgo = new Date()
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+        const sixMonthsAgoStr = sixMonthsAgo.toISOString().split('T')[0]
+        jql = `updated >= "${sixMonthsAgoStr}" ORDER BY updated DESC`
+      }
+
+      const url = `https://${credentials.domain}/rest/api/3/search/jql`
+      console.log("Making request to URL:", url)
+
+      const response = await this.api.get(url, {
+        params: {
+          jql,
+          fields: 'key,summary,status,assignee,created,updated,project',
+          maxResults
+        }
+      })
+
+      return response.data.issues || []
+    } catch (error) {
+      console.error('Error fetching issues directly:', error)
       throw error
     }
   }
@@ -335,25 +615,56 @@ class JiraApiService {
     }
 
     try {
-      const response = await fetch('/api/jira', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'get-recent-issues',
-          credentials,
-          params: { maxResults }
+      // Check if we're running on the server side
+      const isServer = typeof window === 'undefined'
+      
+      if (isServer) {
+        // Server-side: make direct Jira API calls
+        return await this.getRecentIssuesDirect(credentials, maxResults)
+      } else {
+        // Client-side: use the API route
+        const response = await fetch('/api/jira', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'get-recent-issues',
+            credentials,
+            params: { maxResults }
+          })
         })
-      })
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch recent issues')
+        if (!response.ok) {
+          throw new Error('Failed to fetch recent issues')
+        }
+
+        const data = await response.json()
+        return data.issues || []
       }
-
-      const data = await response.json()
-      // console.log('Jira API getRecentIssues response:', data)
-      return data.issues || []
     } catch (error) {
       console.error('Error fetching recent issues:', error)
+      throw error
+    }
+  }
+
+  private async getRecentIssuesDirect(credentials: JiraCredentials, maxResults: number): Promise<unknown[]> {
+    try {
+      // Add time restriction to avoid unbounded queries
+      const sixMonthsAgo = new Date()
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+      const sixMonthsAgoStr = sixMonthsAgo.toISOString().split('T')[0]
+      const jql = `updated >= "${sixMonthsAgoStr}" ORDER BY updated DESC`
+
+      const response = await this.api.get(`https://${credentials.domain}/rest/api/3/search/jql`, {
+        params: {
+          jql,
+          fields: 'key,summary,status,assignee,created,updated,project',
+          maxResults
+        }
+      })
+
+      return response.data.issues || []
+    } catch (error) {
+      console.error('Error fetching recent issues directly:', error)
       throw error
     }
   }
@@ -504,7 +815,7 @@ class JiraApiService {
           name: author,
           email: authorEmail,
           avatar: this.getInitials(author),
-          team: this.detectTeam(author),
+          team: this.detectTeam(),
           hours: 0,
           tasks: new Set(),
           completed: 0,
@@ -614,24 +925,69 @@ class JiraApiService {
       .slice(0, 2)
   }
 
-  private detectTeam(name: string): string {
+  private detectTeam(): string {
     // This is a simple heuristic - you might want to maintain a proper team mapping
     const teams = ['Frontend', 'Backend', 'Mobile', 'QA']
     const randomTeam = teams[Math.floor(Math.random() * teams.length)]
     return randomTeam
   }
 
+  private cleanDomain(domain: string): string {
+    // Remove protocol prefixes
+    let cleanedDomain = domain
+    if (cleanedDomain.startsWith('https://')) {
+      cleanedDomain = cleanedDomain.replace('https://', '')
+    }
+    if (cleanedDomain.startsWith('http://')) {
+      cleanedDomain = cleanedDomain.replace('http://', '')
+    }
+    
+    // Remove trailing slashes
+    cleanedDomain = cleanedDomain.replace(/\/+$/, '')
+    
+    return cleanedDomain
+  }
+
   async setCredentialsFromUser(user: { jiraOrganization?: { domain: string; email: string; apiToken: string } }) {
     try {
       if (user.jiraOrganization) {
+        const cleanedDomain = this.cleanDomain(user.jiraOrganization.domain)
+        
         this.setCredentials({
-          domain: user.jiraOrganization.domain,
+          domain: cleanedDomain,
           email: user.jiraOrganization.email,
           apiToken: user.jiraOrganization.apiToken
         })
       }
     } catch (error) {
       console.error('Error setting credentials from user:', error)
+      throw error
+    }
+  }
+
+  async setCredentialsFromOrganization(organization: { jiraOrganization?: { domain: string; email: string; apiToken: string } }) {
+    try {
+      if (organization.jiraOrganization) {
+        console.log("Setting credentials from organization:")
+        console.log("Domain:", organization.jiraOrganization.domain)
+        console.log("Email:", organization.jiraOrganization.email)
+        console.log("API Token length:", organization.jiraOrganization.apiToken?.length || 0)
+        
+        const cleanedDomain = this.cleanDomain(organization.jiraOrganization.domain)
+        console.log("Cleaned domain:", cleanedDomain)
+        
+        this.setCredentials({
+          domain: cleanedDomain,
+          email: organization.jiraOrganization.email,
+          apiToken: organization.jiraOrganization.apiToken
+        })
+        
+        console.log("Credentials set successfully")
+      } else {
+        console.log("No Jira organization settings found")
+      }
+    } catch (error) {
+      console.error('Error setting credentials from organization:', error)
       throw error
     }
   }

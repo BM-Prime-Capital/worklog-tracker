@@ -26,9 +26,15 @@ export default function SignUpPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (status === 'authenticated' && session?.user) {
-      // Check if user has organization - redirect to onboarding if not
       const user = session.user as { organizationId?: string; role: string }
-      if (!user.organizationId) {
+      
+      // ADMIN role goes directly to dashboard - they manage the platform, not Jira projects
+      if (user.role === 'ADMIN') {
+        router.push('/dashboard/admin')
+      }
+      // Only MANAGER role needs to have an organization
+      // DEVELOPER role gets organization through invitation, so they don't need onboarding
+      else if (!user.organizationId && user.role === 'MANAGER') {
         router.push('/onboarding/organization')
       } else {
         const dashboardPath = `/dashboard/${user.role.toLowerCase()}`
@@ -185,7 +191,7 @@ export default function SignUpPage() {
 
         {/* Footer */}
         <div className="text-blue-100 text-sm">
-          <p>&copy; 2025 BM Prime Capital. All rights reserved.</p>
+          <p>&copy; 2025 Company. All rights reserved.</p>
         </div>
       </div>
 

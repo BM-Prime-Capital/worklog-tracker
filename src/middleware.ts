@@ -16,8 +16,14 @@ export default withAuth(
       return NextResponse.redirect(new URL('/auth/verify-email', req.url))
     }
 
+    // Get user role once for all checks
+    const userRole = token.role as 'ADMIN' | 'MANAGER' | 'DEVELOPER'
+
     // Check if user has organization - redirect to onboarding if not
-    if (!token.organizationId) {
+    // Only MANAGER role needs to have an organization
+    // ADMIN role manages the platform, not Jira projects, so no organization required
+    // DEVELOPER role gets organization through invitation, so they don't need onboarding
+    if (!token.organizationId && userRole === 'MANAGER') {
       // Skip organization check for onboarding pages and auth pages
       if (pathname.startsWith('/onboarding/') || pathname.startsWith('/auth/')) {
         return NextResponse.next()
@@ -27,13 +33,11 @@ export default withAuth(
 
     // Skip further checks for onboarding pages if user already has organization
     if (pathname.startsWith('/onboarding/')) {
-      const role = token.role as 'ADMIN' | 'MANAGER' | 'DEVELOPER'
-      const dashboardPath = `/dashboard/${role.toLowerCase()}`
+      const dashboardPath = `/dashboard/${userRole.toLowerCase()}`
       return NextResponse.redirect(new URL(dashboardPath, req.url))
     }
 
     // Role-based access control
-    const userRole = token.role as 'ADMIN' | 'MANAGER' | 'DEVELOPER'
     
     if (pathname.startsWith('/dashboard/admin') && userRole !== 'ADMIN') {
       return NextResponse.redirect(new URL('/dashboard', req.url))

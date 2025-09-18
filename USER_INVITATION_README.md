@@ -79,7 +79,7 @@ This will verify your SMTP settings and test the connection.
 3. Fills out user information:
    - First Name
    - Last Name
-   - Email (username@bmprimecapital.com)
+   - Email (user@company.com)
    - Department
    - Employment Type
 4. Submits invitation
@@ -123,7 +123,7 @@ This will verify your SMTP settings and test the connection.
 {
   "firstName": "John",
   "lastName": "Doe",
-  "email": "john.doe@bmprimecapital.com",
+  "email": "john.doe@company.com",
   "department": "software-engineering",
   "employmentType": "permanent"
 }
@@ -136,7 +136,7 @@ This will verify your SMTP settings and test the connection.
   "message": "User invited successfully",
   "user": {
     "id": "user_id",
-    "email": "john.doe@bmprimecapital.com",
+    "email": "john.doe@company.com",
     "firstName": "John",
     "lastName": "Doe",
     "role": "DEVELOPER",
@@ -251,6 +251,9 @@ This will verify your SMTP settings and test the connection.
 ---
 
 For technical support or questions about the invitation system, please contact the development team.
+
+
+
 
 
 

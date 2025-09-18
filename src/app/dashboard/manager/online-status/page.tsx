@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import DashboardLayout from '@/components/layout/DashboardLayout'
-import { formatTimeFromHours } from '@/lib/timeUtils'
+import { formatHours } from '@/lib/timeUtils'
 
 // Mock data structure - in real app this would come from API
 interface DeveloperStatus {
@@ -245,7 +245,7 @@ export default function OnlineStatusPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Avg Hours Today</p>
-                  <p className="text-2xl font-bold text-purple-600">{formatTimeFromHours(stats.averageHours)}</p>
+                  <p className="text-2xl font-bold text-purple-600">{formatHours(stats.averageHours)}</p>
                 </div>
                 <TrendingUp className="w-8 h-8 text-purple-500" />
               </div>
@@ -396,7 +396,7 @@ export default function OnlineStatusPage() {
                       <div className="flex items-center space-x-6 text-sm text-gray-500">
                         <div className="text-right">
                           <p className="font-medium text-gray-900">
-                            {formatTimeFromHours(developer.timeOnline)}
+                            {formatHours(developer.timeOnline)}
                           </p>
                           <p className="text-xs">Today</p>
                         </div>
@@ -458,7 +458,7 @@ export default function OnlineStatusPage() {
                     </div>
                   </div>
                   <div className="text-sm text-gray-600">
-                    Avg: {formatTimeFromHours(day.averageHours)}
+                    Avg: {formatHours(day.averageHours)}
                   </div>
                 </div>
               ))}

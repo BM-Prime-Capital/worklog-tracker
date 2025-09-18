@@ -47,7 +47,7 @@ export default function DeveloperDashboardPage() {
           />
         }
       >
-        <DeveloperDashboard />
+        <DeveloperDashboard selectedDateRange={selectedDateRange} />
       </DashboardLayout>
     </ProtectedRoute>
   )

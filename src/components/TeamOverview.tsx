@@ -2,7 +2,7 @@
 
 import { Users, Clock, CheckCircle, AlertCircle } from 'lucide-react'
 import { Developer } from '@/lib/types'
-import { formatTimeFromHours } from '@/lib/timeUtils'
+import { formatHours } from '@/lib/timeUtils'
 
 interface TeamOverviewProps {
   developers: Developer[]
@@ -41,7 +41,7 @@ export default function TeamOverview({ developers, isLoading }: TeamOverviewProp
               <Clock className="w-5 h-5 text-green-600 mr-2" />
               <span className="text-sm text-gray-700">Total Hours</span>
             </div>
-            <span className="text-lg font-semibold text-green-600">{formatTimeFromHours(totalHours)}</span>
+            <span className="text-lg font-semibold text-green-600">{formatHours(totalHours)}</span>
           </div>
           
           <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
@@ -57,7 +57,7 @@ export default function TeamOverview({ developers, isLoading }: TeamOverviewProp
               <AlertCircle className="w-5 h-5 text-purple-600 mr-2" />
               <span className="text-sm text-gray-700">Average Hours</span>
             </div>
-            <span className="text-lg font-semibold text-purple-600">{formatTimeFromHours(averageHours)}</span>
+            <span className="text-lg font-semibold text-purple-600">{formatHours(averageHours)}</span>
           </div>
         </div>
       )}

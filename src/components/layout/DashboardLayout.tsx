@@ -2,9 +2,8 @@
 
 import { useState } from 'react'
 import { BarChart3, Calendar, CheckCircle, Clock, Code, FolderOpen, LayoutDashboard, Menu, Settings, Trophy, Users, Shield, UserCog, Database, Activity } from 'lucide-react'
-import { useSession } from 'next-auth/react'
-import { Session } from 'next-auth'
 import Sidebar from '../Sidebar'
+import UserAvatarDropdown from '../UserAvatarDropdown'
 import { UserRole } from '@/lib/types'
 
 interface DashboardLayoutProps {
@@ -14,15 +13,14 @@ interface DashboardLayoutProps {
   actions?: React.ReactNode
 }
 
-export default function DashboardLayout({ 
-  children, 
-  title, 
-  subtitle, 
-  actions 
+export default function DashboardLayout({
+  children,
+  title,
+  subtitle,
+  actions
 }: DashboardLayoutProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const { data: session } = useSession()
 
   const toggleSidebar = () => {
     setIsSidebarCollapsed(!isSidebarCollapsed)
@@ -84,12 +82,18 @@ export default function DashboardLayout({
             icon: Shield,
             description: 'Security and permissions'
           },
-          ...baseItems.slice(1), // Rewards + Settings
+          {
+            name: "Settings",
+            href: `/dashboard/${role.toLowerCase()}/settings/`,
+            icon: Settings,
+            description: 'Account settings'
+          },
+          // ...baseItems.slice(2), // Rewards + Settings
         ];
 
       case "MANAGER":
         return [
-          ...baseItems.slice(0, 1), // Dashboard 
+          ...baseItems.slice(0, 1), // Dashboard
           {
             name: 'Projects',
             href: `/dashboard/${role.toLowerCase()}/projects`,
@@ -114,48 +118,37 @@ export default function DashboardLayout({
             icon: Activity,
             description: 'Monitor team presence'
           },
-          
+
           ...baseItems.slice(1, ), //  Reward + settings
         ];
 
         case "DEVELOPER":
           return [
             ...baseItems.slice(0, 1), //Dashboard
-            { 
-              name: 'My Tasks', 
-              href: `/dashboard/${role.toLowerCase()}/tasks`, 
-              icon: CheckCircle,
-              description: 'View and manage assigned tasks'
-            },
-            { 
-              name: 'Online Status', 
-              href: `/dashboard/${role.toLowerCase()}/online-status`, 
+
+            {
+              name: 'Online Status',
+              href: `/dashboard/${role.toLowerCase()}/online-status`,
               icon: Users,
               description: 'Set and manage your availability status'
             },
-            { 
-              name: 'My Worklogs', 
-              href: `/dashboard/${role.toLowerCase()}/worklogs`, 
+            {
+              name: 'My Worklogs',
+              href: `/dashboard/${role.toLowerCase()}/worklogs`,
               icon: Clock,
               description: 'Track your time and work activities'
             },
-            { 
-              name: 'Projects', 
-              href: `/dashboard/${role.toLowerCase()}/projects`, 
-              icon: Code,
-              description: 'View project details and contributions'
-            },
             {
-               name: 'Reports', 
-               href: `/dashboard/${role.toLowerCase()}/reports`, 
-               icon: BarChart3,
-               description: 'Generate personal productivity reports'
+              name: 'Projects',
+              href: `/dashboard/${role.toLowerCase()}/projects`,
+              icon: FolderOpen,
+              description: 'View project details and contributions'
             },
 
             ...baseItems.slice(1), //  Reward + Settings
 
           ];
-       
+
 
       default:
         return baseItems;
@@ -168,15 +161,15 @@ export default function DashboardLayout({
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
-          <div 
+          <div
             className="fixed inset-0 bg-gray-600 bg-opacity-75 transition-opacity"
             onClick={toggleMobileMenu}
           />
           <div className="fixed inset-y-0 left-0 z-50 w-64 transform transition-transform">
-            <Sidebar 
+            <Sidebar
               getNavigationItems={getNavigationItems}
-              isCollapsed={false} 
-              onToggle={toggleMobileMenu} 
+              isCollapsed={false}
+              onToggle={toggleMobileMenu}
             />
           </div>
         </div>
@@ -184,10 +177,10 @@ export default function DashboardLayout({
 
       {/* Desktop Sidebar */}
       <div className="hidden lg:block lg:fixed lg:inset-y-0 lg:left-0 lg:z-50">
-        <Sidebar 
+        <Sidebar
           getNavigationItems={getNavigationItems}
-          isCollapsed={isSidebarCollapsed} 
-          onToggle={toggleSidebar} 
+          isCollapsed={isSidebarCollapsed}
+          onToggle={toggleSidebar}
         />
       </div>
 
@@ -206,7 +199,7 @@ export default function DashboardLayout({
               >
                 <Menu className="w-5 h-5 text-gray-600" />
               </button>
-              
+
               {title && (
                 <div>
                   <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
@@ -224,17 +217,9 @@ export default function DashboardLayout({
                   {actions}
                 </div>
               )}
-              
-              {/* User Avatar */}
-              {session?.user && (
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-                    <span className="text-sm font-medium text-white">
-                      {(session.user as Session['user']).firstName?.charAt(0) || 'U'}{(session.user as Session['user']).lastName?.charAt(0) || ''}
-                    </span>
-                  </div>
-                </div>
-              )}
+
+              {/* User Avatar Dropdown */}
+              <UserAvatarDropdown />
             </div>
           </div>
         </div>

@@ -166,6 +166,7 @@ class JiraApiService {
   async testConnection(): Promise<boolean> {
     try {
       const credentials = await this.getCredentials()
+      console.log("Credentials:", credentials)
       if (!credentials) return false
 
       const response = await fetch('/api/jira', {
@@ -263,85 +264,189 @@ class JiraApiService {
       console.log("Email:", credentials.email)
       console.log("API Token length:", credentials.apiToken?.length || 0)
       
-      // Build JQL query for worklogs
-      let jql = `worklogDate >= "${startDate}" AND worklogDate <= "${endDate}"`
-      if (projectKeys && projectKeys.length > 0) {
-        jql += ` AND project IN (${projectKeys.map(key => `"${key}"`).join(', ')})`
-      }
+      // Try multiple approaches to get worklogs
+      const worklogs: JiraWorklog[] = []
+      
+      // Approach 1: Try to get worklogs using a simpler JQL query
+      try {
+        let jql = 'updated >= -7d' // Get recently updated issues (shorter timeframe)
+        if (projectKeys && projectKeys.length > 0) {
+          jql += ` AND project IN (${projectKeys.map(key => `"${key}"`).join(', ')})`
+        }
 
-      const url = `https://${credentials.domain}/rest/api/3/search`
-      console.log("Making request to URL:", url)
-
-      // First, get issues that have worklogs in the date range
-      const issuesResponse = await this.api.get(url, {
-        params: {
+        const url = `https://${credentials.domain}/rest/api/3/search/jql`
+        console.log("Making search request to URL:", url)
+        console.log("JQL query:", jql)
+        console.log("Request params:", {
           jql,
           fields: 'key,summary,worklog',
-          maxResults: 1000
+          maxResults: 100
+        })
+
+        const issuesResponse = await this.api.get(url, {
+          params: {
+            jql,
+            fields: 'key,summary,worklog',
+            maxResults: 100
+          }
+        })
+
+        const issues = issuesResponse.data.issues || []
+        console.log(`Found ${issues.length} issues to check for worklogs`)
+
+        // For each issue, get the worklogs
+        for (const issue of issues) {
+          try {
+            if (issue.fields.worklog && issue.fields.worklog.total > 0) {
+              const worklogUrl = `https://${credentials.domain}/rest/api/3/issue/${issue.id}/worklog`
+              const worklogResponse = await this.api.get(worklogUrl)
+              const issueWorklogs = worklogResponse.data.worklogs || []
+              
+              // Filter worklogs by date range
+              const filteredWorklogs = issueWorklogs.filter((worklog: {
+                started: string;
+                id: string;
+                timeSpentSeconds: number;
+                timeSpent: string;
+                comment?: string;
+                attachments?: unknown[];
+                author: {
+                  accountId: string;
+                  displayName: string;
+                  emailAddress: string;
+                };
+              }) => {
+                const worklogDate = new Date(worklog.started).toISOString().split('T')[0]
+                return worklogDate >= startDate && worklogDate <= endDate
+              })
+
+              // Transform worklogs to our format
+              filteredWorklogs.forEach((worklog: {
+                id: string;
+                timeSpentSeconds: number;
+                timeSpent: string;
+                started: string;
+                comment?: string;
+                attachments?: unknown[];
+                author: {
+                  accountId: string;
+                  displayName: string;
+                  emailAddress: string;
+                };
+              }) => {
+                worklogs.push({
+                  id: worklog.id,
+                  issueId: issue.id,
+                  issueKey: issue.key,
+                  summary: issue.fields.summary,
+                  author: {
+                    accountId: worklog.author.accountId,
+                    displayName: worklog.author.displayName,
+                    emailAddress: worklog.author.emailAddress
+                  },
+                  timeSpentSeconds: worklog.timeSpentSeconds,
+                  timeSpent: worklog.timeSpent,
+                  started: worklog.started,
+                  comment: worklog.comment,
+                  attachments: (worklog.attachments || []) as JiraAttachment[]
+                })
+              })
+            }
+          } catch (issueError) {
+            console.warn(`Error fetching worklogs for issue ${issue.key}:`, issueError)
+            // Continue with other issues even if one fails
+          }
         }
-      })
-
-      const issues = issuesResponse.data.issues || []
-      const worklogs: JiraWorklog[] = []
-
-      // For each issue, get the worklogs
-      for (const issue of issues) {
-        if (issue.fields.worklog && issue.fields.worklog.total > 0) {
-          const worklogResponse = await this.api.get(`https://${credentials.domain}/rest/api/3/issue/${issue.id}/worklog`)
-          const issueWorklogs = worklogResponse.data.worklogs || []
+      } catch (searchError) {
+        console.warn("Search approach failed, trying fallback method:", searchError)
+        
+        // Approach 2: Fallback - get all issues and check worklogs individually
+        try {
+          const fallbackUrl = `https://${credentials.domain}/rest/api/3/search/jql`
+          const fallbackJql = 'updated >= -30d ORDER BY updated DESC'
           
-          // Filter worklogs by date range
-          const filteredWorklogs = issueWorklogs.filter((worklog: {
-            started: string;
-            id: string;
-            timeSpentSeconds: number;
-            timeSpent: string;
-            comment?: string;
-            attachments?: unknown[];
-            author: {
-              accountId: string;
-              displayName: string;
-              emailAddress: string;
-            };
-          }) => {
-            const worklogDate = new Date(worklog.started).toISOString().split('T')[0]
-            return worklogDate >= startDate && worklogDate <= endDate
+          console.log("Trying fallback approach with JQL:", fallbackJql)
+          
+          const fallbackResponse = await this.api.get(fallbackUrl, {
+            params: {
+              jql: fallbackJql,
+              fields: 'key,summary',
+              maxResults: 50
+            }
           })
 
-          // Transform worklogs to our format
-          filteredWorklogs.forEach((worklog: {
-            id: string;
-            timeSpentSeconds: number;
-            timeSpent: string;
-            started: string;
-            comment?: string;
-            attachments?: unknown[];
-            author: {
-              accountId: string;
-              displayName: string;
-              emailAddress: string;
-            };
-          }) => {
-            worklogs.push({
-              id: worklog.id,
-              issueId: issue.id,
-              issueKey: issue.key,
-              summary: issue.fields.summary,
-              author: {
-                accountId: worklog.author.accountId,
-                displayName: worklog.author.displayName,
-                emailAddress: worklog.author.emailAddress
-              },
-              timeSpentSeconds: worklog.timeSpentSeconds,
-              timeSpent: worklog.timeSpent,
-              started: worklog.started,
-              comment: worklog.comment,
-              attachments: (worklog.attachments || []) as JiraAttachment[]
-            })
-          })
+          const fallbackIssues = fallbackResponse.data.issues || []
+          console.log(`Fallback: Found ${fallbackIssues.length} issues to check`)
+
+          for (const issue of fallbackIssues) {
+            try {
+              const worklogUrl = `https://${credentials.domain}/rest/api/3/issue/${issue.id}/worklog`
+              const worklogResponse = await this.api.get(worklogUrl)
+              const issueWorklogs = worklogResponse.data.worklogs || []
+              
+              // Filter worklogs by date range
+              const filteredWorklogs = issueWorklogs.filter((worklog: {
+                started: string;
+                id: string;
+                timeSpentSeconds: number;
+                timeSpent: string;
+                comment?: string;
+                attachments?: unknown[];
+                author: {
+                  accountId: string;
+                  displayName: string;
+                  emailAddress: string;
+                };
+              }) => {
+                const worklogDate = new Date(worklog.started).toISOString().split('T')[0]
+                return worklogDate >= startDate && worklogDate <= endDate
+              })
+
+              // Transform worklogs to our format
+              filteredWorklogs.forEach((worklog: {
+                id: string;
+                timeSpentSeconds: number;
+                timeSpent: string;
+                started: string;
+                comment?: string;
+                attachments?: unknown[];
+                author: {
+                  accountId: string;
+                  displayName: string;
+                  emailAddress: string;
+                };
+              }) => {
+                worklogs.push({
+                  id: worklog.id,
+                  issueId: issue.id,
+                  issueKey: issue.key,
+                  summary: issue.fields.summary,
+                  author: {
+                    accountId: worklog.author.accountId,
+                    displayName: worklog.author.displayName,
+                    emailAddress: worklog.author.emailAddress
+                  },
+                  timeSpentSeconds: worklog.timeSpentSeconds,
+                  timeSpent: worklog.timeSpent,
+                  started: worklog.started,
+                  comment: worklog.comment,
+                  attachments: (worklog.attachments || []) as JiraAttachment[]
+                })
+              })
+            } catch (issueError) {
+              console.warn(`Fallback: Error fetching worklogs for issue ${issue.key}:`, issueError)
+            }
+          }
+        } catch (fallbackError) {
+          console.error("Fallback approach also failed, trying minimal approach:", fallbackError)
+          
+          // Approach 3: Minimal approach - just return empty array to prevent complete failure
+          console.log("All worklog fetching approaches failed, returning empty array")
+          return []
         }
       }
 
+      console.log(`Found ${worklogs.length} worklogs in date range`)
       return worklogs
     } catch (error) {
       console.error('Error fetching worklogs directly:', error)
@@ -472,13 +577,20 @@ class JiraApiService {
 
   private async getIssuesDirect(credentials: JiraCredentials, projectKeys?: string[], maxResults: number = 50): Promise<unknown[]> {
     try {
-      // Build JQL query
-      let jql = 'ORDER BY updated DESC'
+      // Build JQL query with time restriction to avoid unbounded queries
+      let jql = ''
       if (projectKeys && projectKeys.length > 0) {
-        jql = `project IN (${projectKeys.map(key => `"${key}"`).join(', ')}) ORDER BY updated DESC`
+        const projectClause = projectKeys.map(key => `project = "${key}"`).join(' OR ')
+        jql = `(${projectClause}) ORDER BY updated DESC`
+      } else {
+        // Add time restriction to avoid unbounded queries
+        const sixMonthsAgo = new Date()
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+        const sixMonthsAgoStr = sixMonthsAgo.toISOString().split('T')[0]
+        jql = `updated >= "${sixMonthsAgoStr}" ORDER BY updated DESC`
       }
 
-      const url = `https://${credentials.domain}/rest/api/3/search`
+      const url = `https://${credentials.domain}/rest/api/3/search/jql`
       console.log("Making request to URL:", url)
 
       const response = await this.api.get(url, {
@@ -536,10 +648,16 @@ class JiraApiService {
 
   private async getRecentIssuesDirect(credentials: JiraCredentials, maxResults: number): Promise<unknown[]> {
     try {
-      const response = await this.api.get(`https://${credentials.domain}/rest/api/3/search`, {
+      // Add time restriction to avoid unbounded queries
+      const sixMonthsAgo = new Date()
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+      const sixMonthsAgoStr = sixMonthsAgo.toISOString().split('T')[0]
+      const jql = `updated >= "${sixMonthsAgoStr}" ORDER BY updated DESC`
+
+      const response = await this.api.get(`https://${credentials.domain}/rest/api/3/search/jql`, {
         params: {
-          jql: 'ORDER BY updated DESC',
-          fields: 'key,summary,status,assignee,created,updated',
+          jql,
+          fields: 'key,summary,status,assignee,created,updated,project',
           maxResults
         }
       })

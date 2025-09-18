@@ -5,6 +5,7 @@ import dbConnect from '@/lib/db'
 import User from '@/models/User'
 import Organization from '@/models/Organization'
 import { jiraApiEnhanced } from '@/lib/jiraApiEnhanced'
+import { roundHours } from '@/lib/timeUtils'
 
 export async function GET(req: NextRequest) {
   try {
@@ -165,8 +166,8 @@ export async function GET(req: NextRequest) {
           totalContributions: developerWorklogs.length
         },
         stats: {
-          totalHoursThisWeek: developerData.hours,
-          totalHoursLastWeek: await calculateLastWeekHours(user.atlassianAccountId, startDate),
+          totalHoursThisWeek: roundHours(developerData.hours), // Round to whole number
+          totalHoursLastWeek: roundHours(await calculateLastWeekHours(user.atlassianAccountId, startDate)),
           hoursChange: calculateChangePercentage(developerData.hours, await calculateLastWeekHours(user.atlassianAccountId, startDate)),
           tasksCompletedThisWeek: developerData.completed,
           tasksCompletedLastWeek: await calculateLastWeekTasks(user.atlassianAccountId, startDate),
@@ -210,7 +211,7 @@ function calculateWeeklyBreakdown(worklogs: any[], startDate: string, endDate: s
     
     breakdown.push({
       day: dayName,
-      hours: Math.round(hours * 100) / 100,
+      hours: roundHours(hours), // Round to whole number for display
       tasks
     })
   }
@@ -280,7 +281,7 @@ function generateRecentActivity(worklogs: any[], issues: any[]) {
       project: worklog.issueKey.split('-')[0],
       title: worklog.summary,
       timestamp: formatTimestamp(worklog.started),
-      hours: Math.round((worklog.timeSpentSeconds / 3600) * 100) / 100
+      hours: roundHours(worklog.timeSpentSeconds / 3600)
     })
   })
   

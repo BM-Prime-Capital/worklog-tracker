@@ -66,31 +66,55 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate a temporary password (user will change this)
-    const tempPassword = crypto.randomBytes(8).toString('hex')
-    
-    // Generate password reset token for invitation
-    const resetToken = crypto.randomBytes(32).toString('hex')
-    const resetTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+    // Generate invitation token for Atlassian OAuth flow
+    const invitationToken = crypto.randomBytes(32).toString('hex')
+    const invitationExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
 
-    // Create new user with DEVELOPER role
+    // Get the manager's organization ID
+    const manager = await User.findById((session as SessionWithUser).user.id)
+    if (!manager || !manager.organizationId) {
+      return NextResponse.json(
+        { success: false, message: 'Manager must have an organization to invite users' },
+        { status: 400 }
+      )
+    }
+
+    // Create pending user with DEVELOPER role (no password needed for Atlassian OAuth)
     const newUser = new User({
       email: body.email.toLowerCase(),
-      password: tempPassword, // This will be hashed by the User model pre-save middleware
       firstName: body.firstName.trim(),
       lastName: body.lastName.trim(),
       role: 'DEVELOPER', // Always set as DEVELOPER for invited users
-      isEmailVerified: false, // Will be verified when they set their password
-      resetPasswordToken: resetToken,
-      resetPasswordExpires: resetTokenExpiry,
-      // Additional fields can be added here as needed
+      status: 'invited', // Pending invitation status
+      organizationId: manager.organizationId, // Inherit organization from manager
+      invitedBy: (session as SessionWithUser).user.id,
+      invitedAt: new Date(),
+      invitationToken: invitationToken,
+      invitationExpires: invitationExpires,
+      authMethods: ['atlassian'], // Start with Atlassian OAuth only
+      isEmailVerified: false, // Will be verified when they complete OAuth
+      department: body.department, // Save department from invitation
+      employmentType: body.employmentType, // Save employment type from invitation
+    })
+
+    console.log('Creating user with data:', {
+      email: newUser.email,
+      firstName: newUser.firstName,
+      lastName: newUser.lastName,
+      role: newUser.role,
+      status: newUser.status,
+      organizationId: newUser.organizationId,
+      department: newUser.department,
+      employmentType: newUser.employmentType,
+      authMethods: newUser.authMethods,
+      hasPassword: !!newUser.password
     })
 
     await newUser.save()
 
-    // Generate invitation link
+    // Generate invitation link for Atlassian OAuth flow
     const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-    const invitationLink = `${baseUrl}/auth/set-password?token=${resetToken}`
+    const invitationLink = `${baseUrl}/invite/accept?token=${invitationToken}`
 
     // Send invitation email
     const emailSent = await emailService.sendInvitationEmail({
@@ -106,17 +130,18 @@ export async function POST(request: NextRequest) {
       // Don't fail the request if email fails, but log it
     }
 
-    // Return success response (don't include the temp password)
+    // Return success response
     return NextResponse.json({
       success: true,
-      message: 'User invited successfully',
+      message: 'Developer invitation sent successfully. They will receive an email to complete their Atlassian OAuth setup.',
       user: {
         id: newUser._id,
         email: newUser.email,
         firstName: newUser.firstName,
         lastName: newUser.lastName,
         role: newUser.role,
-        isEmailVerified: newUser.isEmailVerified,
+        status: newUser.status,
+        invitedAt: newUser.invitedAt,
         createdAt: newUser.createdAt
       },
       emailSent
@@ -124,8 +149,18 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error inviting user:', error)
+    
+    // Log detailed validation errors
+    if (error instanceof Error && 'errors' in error) {
+      console.error('Validation errors:', (error as any).errors)
+    }
+    
     return NextResponse.json(
-      { success: false, message: 'Failed to invite user' },
+      { 
+        success: false, 
+        message: 'Failed to invite user',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     )
   }

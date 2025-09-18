@@ -10,7 +10,9 @@ export async function POST(request: NextRequest) {
     }
 
     const auth = Buffer.from(`${credentials.email}:${credentials.apiToken}`).toString('base64')
+    console.log("Auth: buffer", auth)
     const baseUrl = `https://${credentials.domain}/rest/api/3`
+    console.log("Base URL:", baseUrl)
 
     let response
 
@@ -24,8 +26,10 @@ export async function POST(request: NextRequest) {
       case 'get-worklogs':
         const { startDate, endDate, projectKeys } = params
         const jql = buildWorklogJQL(startDate, endDate, projectKeys)
+        console.log('Generated JQL:', jql)
+        console.log('Parameters:', { startDate, endDate, projectKeys })
 
-        response = await axios.get(`${baseUrl}/search`, {
+        response = await axios.get(`${baseUrl}/search/jql`, {
           headers: { Authorization: `Basic ${auth}` },
           params: {
             jql,
@@ -55,14 +59,20 @@ export async function POST(request: NextRequest) {
 
       case 'get-issues':
         const { projectKeys: issueProjectKeys, maxResults } = params
-        let issueJql = 'ORDER BY updated DESC'
+        let issueJql = ''
 
         if (issueProjectKeys && issueProjectKeys.length > 0) {
-          const projectClause = issueProjectKeys.map((key: string) => `project = ${key}`).join(' OR ')
-          issueJql = `(${projectClause}) AND ${issueJql}`
+          const projectClause = issueProjectKeys.map((key: string) => `project = "${key}"`).join(' OR ')
+          issueJql = `(${projectClause}) ORDER BY updated DESC`
+        } else {
+          // Add time restriction to avoid unbounded queries
+          const sixMonthsAgo = new Date()
+          sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+          const sixMonthsAgoStr = sixMonthsAgo.toISOString().split('T')[0]
+          issueJql = `updated >= "${sixMonthsAgoStr}" ORDER BY updated DESC`
         }
 
-        response = await axios.get(`${baseUrl}/search`, {
+        response = await axios.get(`${baseUrl}/search/jql`, {
           headers: { Authorization: `Basic ${auth}` },
           params: {
             jql: issueJql,
@@ -75,10 +85,16 @@ export async function POST(request: NextRequest) {
 
       case 'get-recent-issues':
         const { maxResults: recentMaxResults } = params
-        response = await axios.get(`${baseUrl}/search`, {
+        // Add time restriction to avoid unbounded queries
+        const sixMonthsAgo = new Date()
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+        const sixMonthsAgoStr = sixMonthsAgo.toISOString().split('T')[0]
+        const recentJql = `updated >= "${sixMonthsAgoStr}" ORDER BY updated DESC`
+
+        response = await axios.get(`${baseUrl}/search/jql`, {
           headers: { Authorization: `Basic ${auth}` },
           params: {
-            jql: 'ORDER BY updated DESC',
+            jql: recentJql,
             fields: 'summary,status,assignee,created,updated,project',
             maxResults: recentMaxResults || 50
           }
@@ -88,58 +104,73 @@ export async function POST(request: NextRequest) {
 
       case 'get-project-issue-count':
         const { projectKey } = params
-        response = await axios.get(`${baseUrl}/search`, {
+        response = await axios.get(`${baseUrl}/search/jql`, {
           headers: { Authorization: `Basic ${auth}` },
           params: {
-            jql: `project = ${projectKey}`,
-            maxResults: 0
+            jql: `project = "${projectKey}"`,
+            maxResults: 1000, // Get up to 1000 issues to count them
+            fields: 'key'
           }
         })
         // console.log(`Jira API get-project-issue-count response for ${projectKey}:`, response.data)
-        return NextResponse.json({ total: response.data.total })
+        const totalCount = response.data.issues?.length || 0
+        return NextResponse.json({ total: totalCount })
 
       case 'get-project-done-issues-count':
         const { projectKey: doneProjectKey } = params
-        response = await axios.get(`${baseUrl}/search`, {
+        response = await axios.get(`${baseUrl}/search/jql`, {
           headers: { Authorization: `Basic ${auth}` },
           params: {
-            jql: `project = ${doneProjectKey} AND statusCategory = Done`,
-            maxResults: 0
+            jql: `project = "${doneProjectKey}" AND statusCategory = Done`,
+            maxResults: 1000, // Get up to 1000 done issues to count them
+            fields: 'key'
           }
         })
         // console.log(`Jira API get-project-done-issues-count response for ${doneProjectKey}:`, response.data)
-        return NextResponse.json({ total: response.data.total })
+        const doneCount = response.data.issues?.length || 0
+        return NextResponse.json({ total: doneCount })
 
       case 'get-project-stats':
         const { projectKey: statsProjectKey } = params
 
-        // Fetch total issues count
-        const totalResponse = await axios.get(`${baseUrl}/search`, {
+        // For the new /search/jql endpoint, we need to get all issues to count them properly
+        // Since we can't get a total count directly, we'll fetch all issues and count them
+        console.log(`Fetching all issues for project: ${statsProjectKey}`)
+        
+        // Get all issues for the project (with a reasonable limit)
+        const totalResponse = await axios.get(`${baseUrl}/search/jql`, {
           headers: { Authorization: `Basic ${auth}` },
           params: {
-            jql: `project = ${statsProjectKey}`,
-            maxResults: 0
+            jql: `project = "${statsProjectKey}"`,
+            maxResults: 1000, // Get up to 1000 issues
+            fields: 'key,status'
           }
         })
+        console.log(`Total issues response for ${statsProjectKey}:`, totalResponse.data)
 
-        // Fetch done issues count
-        const doneResponse = await axios.get(`${baseUrl}/search`, {
+        // Get all done issues for the project
+        const doneResponse = await axios.get(`${baseUrl}/search/jql`, {
           headers: { Authorization: `Basic ${auth}` },
           params: {
-            jql: `project = ${statsProjectKey} AND statusCategory = Done`,
-            maxResults: 0
+            jql: `project = "${statsProjectKey}" AND statusCategory = Done`,
+            maxResults: 1000, // Get up to 1000 done issues
+            fields: 'key,status'
           }
         })
+        console.log(`Done issues response for ${statsProjectKey}:`, doneResponse.data)
 
-        const totalIssues = totalResponse.data.total || 0
-        const doneIssues = doneResponse.data.total || 0
+        // Count the actual issues returned
+        const totalIssues = totalResponse.data.issues?.length || 0
+        const doneIssues = doneResponse.data.issues?.length || 0
         const progressPercentage = totalIssues > 0 ? Math.round((doneIssues / totalIssues) * 100) : 0
 
-        // console.log(`Jira API get-project-stats response for ${statsProjectKey}:`, {
-        //   totalIssues,
-        //   doneIssues,
-        //   progressPercentage
-        // })
+        console.log(`Jira API get-project-stats response for ${statsProjectKey}:`, {
+          totalIssues,
+          doneIssues,
+          progressPercentage,
+          totalResponseData: totalResponse.data,
+          doneResponseData: doneResponse.data
+        })
 
         return NextResponse.json({
           totalIssues,
@@ -159,8 +190,27 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     console.error('Jira API error:', error)
 
-    if (error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'status' in error.response && error.response.status === 401) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+    if (error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'status' in error.response) {
+      const status = error.response.status
+      if (status === 401) {
+        return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+      }
+      if (status === 400) {
+        console.error('400 Bad Request error details:', error.response)
+        const responseData = 'data' in error.response ? error.response.data : undefined
+        return NextResponse.json({ 
+          error: 'Bad Request - JQL query syntax error or invalid parameters.', 
+          details: responseData 
+        }, { status: 400 })
+      }
+      if (status === 410) {
+        console.error('410 Gone error details:', error.response)
+        const responseData = 'data' in error.response ? error.response.data : undefined
+        return NextResponse.json({ 
+          error: 'JQL query not supported. This might be due to unsupported fields or syntax.', 
+          details: responseData 
+        }, { status: 410 })
+      }
     }
 
     const errorMessage = error instanceof Error ? error.message : 'An error occurred'
@@ -172,14 +222,23 @@ export async function POST(request: NextRequest) {
 }
 
 function buildWorklogJQL(startDate: string, endDate: string, projectKeys?: string[]): string {
-  let worklogJql = `worklogDate >= "${startDate}" AND worklogDate <= "${endDate}"`
-
+  let issueJql = ''
+  
   if (projectKeys && projectKeys.length > 0) {
-    const projectClause = projectKeys.map(key => `project = ${key}`).join(' OR ')
-    worklogJql += ` AND (${projectClause})`
+    // Properly quote project keys in JQL
+    const projectClause = projectKeys.map(key => `project = "${key}"`).join(' OR ')
+    issueJql = `(${projectClause})`
+  } else {
+    // If no project keys specified, add a time-based restriction to avoid unbounded queries
+    // Use updated date within last 6 months as a reasonable default
+    const sixMonthsAgo = new Date()
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+    const sixMonthsAgoStr = sixMonthsAgo.toISOString().split('T')[0]
+    issueJql = `updated >= "${sixMonthsAgoStr}"`
   }
-
-  return worklogJql
+  
+  // Add ordering
+  return `${issueJql} ORDER BY updated DESC`
 }
 
 function extractWorklogs(issues: unknown[], startDate: string, endDate: string) {
@@ -233,14 +292,14 @@ function extractWorklogs(issues: unknown[], startDate: string, endDate: string) 
 
 
             if (worklog && typeof worklog === 'object' && 'comment' in worklog && worklog.comment) {
-              console.log('Processing worklog comment:', worklog.comment)
-              console.log('Comment type:', typeof worklog.comment)
+              // console.log('Processing worklog comment:', worklog.comment)
+              // console.log('Comment type:', typeof worklog.comment)
 
               if (typeof worklog.comment === 'string') {
                 commentText = worklog.comment
-                console.log('String comment extracted:', commentText)
+                // console.log('String comment extracted:', commentText)
               } else if (typeof worklog.comment === 'object' && worklog.comment !== null) {
-                console.log('Object comment structure:', JSON.stringify(worklog.comment, null, 2))
+                // console.log('Object comment structure:', JSON.stringify(worklog.comment, null, 2))
 
                 // Handle Jira's structured content format
                 if ('content' in worklog.comment && Array.isArray((worklog.comment as { content: unknown[] }).content)) {
@@ -256,7 +315,7 @@ function extractWorklogs(issues: unknown[], startDate: string, endDate: string) 
                 }
               }
             } else {
-              console.log('No comment found in worklog')
+              // console.log('No comment found in worklog')
             }
 
             // console.log('Final comment text:', commentText)
@@ -357,6 +416,6 @@ function extractAttachmentsFromContent(content: unknown[]): unknown[] {
   }
 
   content.forEach(extractFromNode)
-  console.log('Final extracted attachments:', attachments)
+  // console.log('Final extracted attachments:', attachments)
   return attachments
 }

@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Loader2, CheckCircle, XCircle, ExternalLink } from 'lucide-react'
 
-export default function InviteAcceptPage() {
+function InviteAcceptContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [status, setStatus] = useState<'loading' | 'valid' | 'invalid' | 'expired'>('loading')
@@ -199,5 +199,27 @@ export default function InviteAcceptPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function InviteAcceptPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          <div className="bg-white py-8 px-6 shadow-xl rounded-lg">
+            <div className="text-center">
+              <Loader2 className="h-12 w-12 text-blue-600 animate-spin mx-auto mb-4" />
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">Loading Invitation</h1>
+              <p className="text-gray-600">
+                Please wait while we process your invitation...
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    }>
+      <InviteAcceptContent />
+    </Suspense>
   )
 }

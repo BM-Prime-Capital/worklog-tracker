@@ -543,7 +543,7 @@ export default function TeamPage() {
       const userData = {
         firstName: newMemberForm.firstName,
         lastName: newMemberForm.lastName,
-        email: `${newMemberForm.email}@bmprimecapital.com`,
+        email: newMemberForm.email, // Send full email as provided
         department: newMemberForm.department as 'software-engineering' | 'venture-capital' | 'graphic-design' | 'communication',
         employmentType: newMemberForm.employmentType as 'permanent' | 'intern'
       }
@@ -1151,24 +1151,19 @@ export default function TeamPage() {
                 {/* Email */}
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                    Email *
+                    Email Address *
                   </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      id="email"
-                      required
-                      value={newMemberForm.email}
-                      onChange={(e) => handleFormChange('email', e.target.value)}
-                      className="w-full px-3 py-2 pr-20 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="username"
-                    />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <span className="text-gray-500 text-sm">@bmprimecapital.com</span>
-                    </div>
-                  </div>
+                  <input
+                    type="email"
+                    id="email"
+                    required
+                    value={newMemberForm.email}
+                    onChange={(e) => handleFormChange('email', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="user@company.com"
+                  />
                   <p className="text-xs text-gray-500 mt-1">
-                    Just enter the username part. The @bmprimecapital.com domain will be added automatically.
+                    Enter the complete email address for the team member.
                   </p>
                 </div>
 
@@ -1210,14 +1205,6 @@ export default function TeamPage() {
                   </select>
                 </div>
 
-                {/* Preview */}
-                {newMemberForm.email && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p className="text-sm text-blue-800">
-                      <span className="font-medium">Full email:</span> {newMemberForm.email}@bmprimecapital.com
-                    </p>
-                  </div>
-                )}
               </form>
             </div>
 

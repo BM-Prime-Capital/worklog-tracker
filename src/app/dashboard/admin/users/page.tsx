@@ -1,213 +1,79 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
+import { useState } from 'react'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import DashboardLayout from '@/components/layout/DashboardLayout'
+import UserDetailsModal from '@/components/admin/UserDetailsModal'
+import { useAdminUsers } from '@/hooks/useAdminUsers'
+import { adminService } from '@/lib/adminService'
 import { 
   Users, 
   Search, 
-  Filter, 
-  MoreVertical, 
-  Mail, 
-  Phone, 
-  Building, 
-  Calendar,
   Shield,
-  CheckCircle,
-  X,
   Plus,
   Edit,
   Trash2,
   Eye,
   UserCog,
-  Code
+  Code,
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react'
 
-interface User {
-  id: string
-  firstName: string
-  lastName: string
-  email: string
-  role: 'ADMIN' | 'MANAGER' | 'DEVELOPER'
-  department: string
-  isActive: boolean
-  lastLogin?: string
-  createdAt: string
-  isEmailVerified: boolean
-}
-
 export default function AdminUsersPage() {
-  const { data: session } = useSession()
-  const [users, setUsers] = useState<User[]>([])
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState<'all' | 'ADMIN' | 'MANAGER' | 'DEVELOPER'>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
-  const [isLoading, setIsLoading] = useState(true)
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        // TODO: Replace with actual API call
-        // const response = await fetch('/api/admin/users')
-        // const data = await response.json()
-        
-        // Mock data for now
-        const mockUsers: User[] = [
-          {
-            id: '1',
-            firstName: 'Admin',
-            lastName: 'User',
-            email: 'admin@bmprimecapital.com',
-            role: 'ADMIN',
-            department: 'software-engineering',
-            isActive: true,
-            lastLogin: '2025-01-15T10:30:00Z',
-            createdAt: '2024-01-01T00:00:00Z',
-            isEmailVerified: true
-          },
-          {
-            id: '2',
-            firstName: 'Sarah',
-            lastName: 'Johnson',
-            email: 'sarah.johnson@bmprimecapital.com',
-            role: 'MANAGER',
-            department: 'software-engineering',
-            isActive: true,
-            lastLogin: '2025-01-15T10:30:00Z',
-            createdAt: '2024-06-15T09:00:00Z',
-            isEmailVerified: true
-          },
-          {
-            id: '3',
-            firstName: 'Michael',
-            lastName: 'Chen',
-            email: 'michael.chen@bmprimecapital.com',
-            role: 'MANAGER',
-            department: 'venture-capital',
-            isActive: true,
-            lastLogin: '2025-01-14T16:45:00Z',
-            createdAt: '2024-08-20T14:30:00Z',
-            isEmailVerified: true
-          },
-          {
-            id: '4',
-            firstName: 'John',
-            lastName: 'Doe',
-            email: 'john.doe@bmprimecapital.com',
-            role: 'DEVELOPER',
-            department: 'software-engineering',
-            isActive: true,
-            lastLogin: '2025-01-15T09:15:00Z',
-            createdAt: '2024-07-10T11:20:00Z',
-            isEmailVerified: true
-          },
-          {
-            id: '5',
-            firstName: 'Jane',
-            lastName: 'Smith',
-            email: 'jane.smith@bmprimecapital.com',
-            role: 'DEVELOPER',
-            department: 'graphic-design',
-            isActive: false,
-            lastLogin: '2025-01-10T11:20:00Z',
-            createdAt: '2024-09-10T10:15:00Z',
-            isEmailVerified: false
-          }
-        ]
-        
-        setUsers(mockUsers)
-        setFilteredUsers(mockUsers)
-      } catch (error) {
-        console.error('Error fetching users:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
+  const { 
+    users, 
+    pagination, 
+    isLoading, 
+    error, 
+    refetch, 
+    updateFilters 
+  } = useAdminUsers({
+    search: searchTerm,
+    role: roleFilter,
+    status: statusFilter
+  })
 
-    if (session?.user) {
-      fetchUsers()
-    }
-  }, [session])
-
-  // Filter users based on search and filters
-  useEffect(() => {
-    let filtered = users
-
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(user =>
-        user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    }
-
-    // Role filter
-    if (roleFilter !== 'all') {
-      filtered = filtered.filter(user => user.role === roleFilter)
-    }
-
-    // Status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(user =>
-        statusFilter === 'active' ? user.isActive : !user.isActive
-      )
-    }
-
-    setFilteredUsers(filtered)
-  }, [users, searchTerm, roleFilter, statusFilter])
-
-  const getDepartmentName = (department: string) => {
-    const departments: Record<string, string> = {
-      'software-engineering': 'Software Engineering',
-      'venture-capital': 'Venture Capital',
-      'graphic-design': 'Graphic Design',
-      'communication': 'Communication'
-    }
-    return departments[department] || department
+  const handleSearch = (value: string) => {
+    setSearchTerm(value)
+    updateFilters({ search: value })
   }
 
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case 'ADMIN': return <Shield className="w-4 h-4" />
-      case 'MANAGER': return <UserCog className="w-4 h-4" />
-      case 'DEVELOPER': return <Code className="w-4 h-4" />
-      default: return <Users className="w-4 h-4" />
-    }
+  const handleRoleFilter = (value: 'all' | 'ADMIN' | 'MANAGER' | 'DEVELOPER') => {
+    setRoleFilter(value)
+    updateFilters({ role: value })
   }
 
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'ADMIN': return 'bg-red-100 text-red-800'
-      case 'MANAGER': return 'bg-purple-100 text-purple-800'
-      case 'DEVELOPER': return 'bg-blue-100 text-blue-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
+  const handleStatusFilter = (value: 'all' | 'active' | 'inactive') => {
+    setStatusFilter(value)
+    updateFilters({ status: value })
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    })
+  const handleUserClick = (userId: string) => {
+    setSelectedUserId(userId)
+    setIsModalOpen(true)
   }
 
-  const formatLastLogin = (dateString?: string) => {
-    if (!dateString) return 'Never'
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
+  const handleUserUpdate = () => {
+    // Refresh the users list to reflect changes
+    refetch()
+  }
+
+  const handleUserDelete = (userId: string) => {
+    // Remove from selected users if it was selected
+    const newSelected = new Set(selectedUsers)
+    newSelected.delete(userId)
+    setSelectedUsers(newSelected)
     
-    if (diffInHours < 24) {
-      return `${diffInHours}h ago`
-    } else {
-      const diffInDays = Math.floor(diffInHours / 24)
-      return `${diffInDays}d ago`
-    }
+    // Refresh the users list
+    refetch()
   }
 
   const toggleUserSelection = (userId: string) => {
@@ -218,6 +84,15 @@ export default function AdminUsersPage() {
       newSelected.add(userId)
     }
     setSelectedUsers(newSelected)
+  }
+
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case 'ADMIN': return <Shield className="w-4 h-4" />
+      case 'MANAGER': return <UserCog className="w-4 h-4" />
+      case 'DEVELOPER': return <Code className="w-4 h-4" />
+      default: return <Users className="w-4 h-4" />
+    }
   }
 
   if (isLoading) {
@@ -238,6 +113,40 @@ export default function AdminUsersPage() {
     )
   }
 
+  if (error) {
+    return (
+      <ProtectedRoute allowedRoles={['ADMIN']}>
+        <DashboardLayout
+          title="User Management"
+          subtitle="Manage all platform users"
+          actions={
+            <button
+              onClick={refetch}
+              className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Retry
+            </button>
+          }
+        >
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Users</h3>
+              <p className="text-gray-600 mb-4">{error}</p>
+              <button
+                onClick={refetch}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        </DashboardLayout>
+      </ProtectedRoute>
+    )
+  }
+
   return (
     <ProtectedRoute allowedRoles={['ADMIN']}>
       <DashboardLayout
@@ -245,6 +154,13 @@ export default function AdminUsersPage() {
         subtitle="Manage all platform users across all roles"
         actions={
           <div className="flex items-center space-x-3">
+            <button
+              onClick={refetch}
+              className="flex items-center px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </button>
             <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
               <Plus className="w-4 h-4 mr-2" />
               Add User
@@ -270,7 +186,7 @@ export default function AdminUsersPage() {
                     type="text"
                     placeholder="Search users..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => handleSearch(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -281,7 +197,7 @@ export default function AdminUsersPage() {
                 {/* Role Filter */}
                 <select
                   value={roleFilter}
-                  onChange={(e) => setRoleFilter(e.target.value as 'all' | 'ADMIN' | 'MANAGER' | 'DEVELOPER')}
+                  onChange={(e) => handleRoleFilter(e.target.value as 'all' | 'ADMIN' | 'MANAGER' | 'DEVELOPER')}
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 >
                   <option value="all">All Roles</option>
@@ -293,7 +209,7 @@ export default function AdminUsersPage() {
                 {/* Status Filter */}
                 <select
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
+                  onChange={(e) => handleStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 >
                   <option value="all">All Status</option>
@@ -316,7 +232,7 @@ export default function AdminUsersPage() {
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                         onChange={(e) => {
                           if (e.target.checked) {
-                            setSelectedUsers(new Set(filteredUsers.map(u => u.id)))
+                            setSelectedUsers(new Set(users.map(u => u._id)))
                           } else {
                             setSelectedUsers(new Set())
                           }
@@ -347,13 +263,13 @@ export default function AdminUsersPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredUsers.map((user) => (
-                    <tr key={user.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
+                  {users.map((user) => (
+                    <tr key={user._id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleUserClick(user._id)}>
+                      <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
-                          checked={selectedUsers.has(user.id)}
-                          onChange={() => toggleUserSelection(user.id)}
+                          checked={selectedUsers.has(user._id)}
+                          onChange={() => toggleUserSelection(user._id)}
                           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                         />
                       </td>
@@ -371,13 +287,13 @@ export default function AdminUsersPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(user.role)}`}>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${adminService.getRoleInfo(user.role).color}`}>
                           {getRoleIcon(user.role)}
                           <span className="ml-1">{user.role}</span>
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {getDepartmentName(user.department)}
+                        {adminService.getDepartmentName(user.department || '')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
@@ -389,7 +305,7 @@ export default function AdminUsersPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatLastLogin(user.lastLogin)}
+                        {adminService.formatLastLogin(user.lastLogin)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
@@ -400,15 +316,27 @@ export default function AdminUsersPage() {
                           {user.isActive ? 'Active' : 'Inactive'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center space-x-2">
-                          <button className="text-blue-600 hover:text-blue-900" title="View Details">
+                          <button 
+                            onClick={() => handleUserClick(user._id)}
+                            className="text-blue-600 hover:text-blue-900" 
+                            title="View Details"
+                          >
                             <Eye className="w-4 h-4" />
                           </button>
-                          <button className="text-green-600 hover:text-green-900" title="Edit User">
+                          <button 
+                            onClick={() => handleUserClick(user._id)}
+                            className="text-green-600 hover:text-green-900" 
+                            title="Edit User"
+                          >
                             <Edit className="w-4 h-4" />
                           </button>
-                          <button className="text-red-600 hover:text-red-900" title="Delete User">
+                          <button 
+                            onClick={() => handleUserClick(user._id)}
+                            className="text-red-600 hover:text-red-900" 
+                            title="Delete User"
+                          >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -421,14 +349,56 @@ export default function AdminUsersPage() {
           </div>
 
           {/* Empty State */}
-          {filteredUsers.length === 0 && (
+          {users.length === 0 && (
             <div className="text-center py-12">
               <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No users found</h3>
               <p className="text-gray-500">Try adjusting your search or filter criteria.</p>
             </div>
           )}
+
+          {/* Pagination */}
+          {pagination && pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between mt-8">
+              <div className="text-sm text-gray-700">
+                Showing {((pagination.currentPage - 1) * pagination.limit) + 1} to{' '}
+                {Math.min(pagination.currentPage * pagination.limit, pagination.totalCount)} of{' '}
+                {pagination.totalCount} results
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => updateFilters({ page: pagination.currentPage - 1 })}
+                  disabled={!pagination.hasPrevPage}
+                  className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <span className="px-3 py-2 text-sm text-gray-700">
+                  Page {pagination.currentPage} of {pagination.totalPages}
+                </span>
+                <button
+                  onClick={() => updateFilters({ page: pagination.currentPage + 1 })}
+                  disabled={!pagination.hasNextPage}
+                  className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* User Details Modal */}
+        <UserDetailsModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false)
+            setSelectedUserId(null)
+          }}
+          userId={selectedUserId}
+          onUserUpdate={handleUserUpdate}
+          onUserDelete={handleUserDelete}
+        />
       </DashboardLayout>
     </ProtectedRoute>
   )

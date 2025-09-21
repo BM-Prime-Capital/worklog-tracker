@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays } from 'date-fns'
 import { Calendar, Download, X, AlertCircle, CheckCircle } from 'lucide-react'
 import { JiraWorklog } from '@/lib/jiraApiEnhanced'
+import { formatHours } from '@/lib/timeUtils'
 
 interface ExportModalProps {
   isOpen: boolean
@@ -95,7 +96,7 @@ export default function ExportModal({ isOpen, onClose, worklogs, onExport }: Exp
     const uniqueIssues = new Set(filteredWorklogs.map(w => w.issueKey)).size
     
     return {
-      totalHours: totalHours.toFixed(2),
+      totalHours: formatHours(totalHours),
       totalDevelopers: uniqueDevelopers,
       totalIssues: uniqueIssues,
       totalEntries: filteredWorklogs.length
@@ -108,7 +109,6 @@ export default function ExportModal({ isOpen, onClose, worklogs, onExport }: Exp
       setExportStatus('idle')
       
       const { start, end } = getPeriodDates()
-      const filteredWorklogs = getFilteredWorklogs()
       
       const exportOptions: ExportOptions = {
         startDate: start,
@@ -315,7 +315,7 @@ export default function ExportModal({ isOpen, onClose, worklogs, onExport }: Exp
                     <span><strong>Period:</strong> {getPeriodLabel()}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <div><strong>Total Hours:</strong> {summary.totalHours}h</div>
+                    <div><strong>Total Hours:</strong> {summary.totalHours}</div>
                     <div><strong>Developers:</strong> {summary.totalDevelopers}</div>
                     <div><strong>Issues:</strong> {summary.totalIssues}</div>
                     <div><strong>Entries:</strong> {summary.totalEntries}</div>

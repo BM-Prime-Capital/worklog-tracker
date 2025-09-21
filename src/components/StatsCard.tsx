@@ -7,9 +7,10 @@ interface StatsCardProps {
   changeType: 'positive' | 'negative' | 'neutral'
   icon: LucideIcon
   description: string
+  isLoading?: boolean
 }
 
-export default function StatsCard({ title, value, change, changeType, icon: Icon, description }: StatsCardProps) {
+export default function StatsCard({ title, value, change, changeType, icon: Icon, description, isLoading = false }: StatsCardProps) {
   const getChangeColor = () => {
     switch (changeType) {
       case 'positive':
@@ -32,13 +33,21 @@ export default function StatsCard({ title, value, change, changeType, icon: Icon
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-gray-600">{title}</p>
-          <p className="text-3xl font-bold text-gray-900 mt-2">{value}</p>
+          <p className="text-3xl font-bold text-gray-900 mt-2">
+            {isLoading ? '...' : value}
+          </p>
           <div className="flex items-center mt-2">
-            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getChangeColor()}`}>
-              <span className="mr-1">{getChangeIcon()}</span>
-              {change}
-            </span>
-            <span className="text-xs text-gray-500 ml-2">{description}</span>
+            {isLoading ? (
+              <span className="text-xs text-gray-500">Loading...</span>
+            ) : (
+              <>
+                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getChangeColor()}`}>
+                  <span className="mr-1">{getChangeIcon()}</span>
+                  {change}
+                </span>
+                <span className="text-xs text-gray-500 ml-2">{description}</span>
+              </>
+            )}
           </div>
         </div>
         <div className="p-3 bg-blue-50 rounded-lg">

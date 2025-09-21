@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import { jiraOrganizationSchema } from '@/lib/validation'
-import { User, Settings, Globe, Key, Building, Save, CheckCircle, AlertCircle, Download, Edit, X } from 'lucide-react'
+import { User, Settings, Globe, Key, Building, Save, CheckCircle, AlertCircle, Download, Edit, X, Clock, Calendar } from 'lucide-react'
 import DateRangePicker from '@/components/DateRangePicker'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 
@@ -35,6 +35,13 @@ export default function ManagerSettingsPage() {
   const [profileSuccess, setProfileSuccess] = useState(false)
   const [isEditingOrganization, setIsEditingOrganization] = useState(false)
   const [organizationSuccess, setOrganizationSuccess] = useState(false)
+  const [checkInWindowData, setCheckInWindowData] = useState({
+    startTime: '08:00',
+    endTime: '10:00',
+    timezone: 'UTC+3'
+  })
+  const [isEditingCheckInWindow, setIsEditingCheckInWindow] = useState(false)
+  const [checkInWindowSuccess, setCheckInWindowSuccess] = useState(false)
 
   useEffect(() => {
     if (user?.jiraOrganization) {
@@ -46,7 +53,22 @@ export default function ManagerSettingsPage() {
         lastName: user.lastName || ''
       })
     }
+    // Fetch check-in window settings
+    fetchCheckInWindow()
   }, [user])
+
+  const fetchCheckInWindow = async () => {
+    try {
+      const response = await fetch('/api/organization/check-in-window')
+      const data = await response.json()
+      
+      if (response.ok && data.success) {
+        setCheckInWindowData(data.checkInWindow)
+      }
+    } catch (error) {
+      console.error('Failed to fetch check-in window:', error)
+    }
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -59,6 +81,14 @@ export default function ManagerSettingsPage() {
   const handleUserDataChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setUserData(prev => ({ ...prev, [name]: value }))
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }))
+    }
+  }
+
+  const handleCheckInWindowChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target
+    setCheckInWindowData(prev => ({ ...prev, [name]: value }))
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }))
     }
@@ -175,6 +205,70 @@ export default function ManagerSettingsPage() {
     setIsLoading(false)
   }
 
+  const handleEditCheckInWindow = () => {
+    setIsEditingCheckInWindow(true)
+    setCheckInWindowSuccess(false)
+    setErrors({})
+  }
+
+  const handleCancelCheckInWindowEdit = () => {
+    setIsEditingCheckInWindow(false)
+    // Reset to original values
+    fetchCheckInWindow()
+    setErrors({})
+  }
+
+  const handleUpdateCheckInWindow = async () => {
+    if (!checkInWindowData.startTime || !checkInWindowData.endTime || !checkInWindowData.timezone) {
+      setErrors({ checkInWindow: 'All fields are required' })
+      return
+    }
+
+    // Validate time format
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/
+    if (!timeRegex.test(checkInWindowData.startTime) || !timeRegex.test(checkInWindowData.endTime)) {
+      setErrors({ checkInWindow: 'Invalid time format. Use HH:MM format (e.g., 08:00)' })
+      return
+    }
+
+    // Validate that start time is before end time
+    const startMinutes = parseInt(checkInWindowData.startTime.split(':')[0]) * 60 + parseInt(checkInWindowData.startTime.split(':')[1])
+    const endMinutes = parseInt(checkInWindowData.endTime.split(':')[0]) * 60 + parseInt(checkInWindowData.endTime.split(':')[1])
+    
+    if (startMinutes >= endMinutes) {
+      setErrors({ checkInWindow: 'Start time must be before end time' })
+      return
+    }
+
+    setIsLoading(true)
+    setErrors({})
+
+    try {
+      const response = await fetch('/api/organization/check-in-window', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(checkInWindowData),
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        setCheckInWindowSuccess(true)
+        setIsEditingCheckInWindow(false)
+        setTimeout(() => setCheckInWindowSuccess(false), 3000)
+      } else {
+        setErrors({ checkInWindow: result.error || 'Failed to update check-in window' })
+      }
+    } catch (error) {
+      console.error('Error updating check-in window:', error)
+      setErrors({ checkInWindow: 'Failed to update check-in window' })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const validateOrganizationForm = () => {
     try {
       jiraOrganizationSchema.parse(jiraData)
@@ -225,7 +319,7 @@ export default function ManagerSettingsPage() {
       }
     >
       <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
           {/* User Information */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100/50 p-6 hover:shadow-lg transition-all duration-200">
             <div className="flex items-center justify-between mb-6">
@@ -524,6 +618,181 @@ export default function ManagerSettingsPage() {
                   <button
                     type="button"
                     onClick={handleCancelOrganizationEdit}
+                    disabled={isLoading}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </form>
+          </div>
+
+          {/* Check-in Window Settings */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100/50 p-6 hover:shadow-lg transition-all duration-200">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <Clock className="w-6 h-6 text-blue-600 mr-3" />
+                <h2 className="text-xl font-semibold text-gray-900">Check-in Window</h2>
+              </div>
+              {!isEditingCheckInWindow && (
+                <button
+                  onClick={handleEditCheckInWindow}
+                  className="flex items-center px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all duration-200"
+                >
+                  <Edit className="w-4 h-4 mr-1" />
+                  Edit
+                </button>
+              )}
+            </div>
+
+            <form className="space-y-4">
+              {/* Start Time */}
+              <div>
+                <label htmlFor="startTime" className="block text-sm font-medium text-gray-700 mb-2">
+                  <Calendar className="w-4 h-4 inline mr-1" />
+                  Start Time
+                </label>
+                <input
+                  type="time"
+                  id="startTime"
+                  name="startTime"
+                  value={checkInWindowData.startTime}
+                  onChange={handleCheckInWindowChange}
+                  disabled={!isEditingCheckInWindow}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                    isEditingCheckInWindow 
+                      ? (errors.startTime ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 bg-white')
+                      : 'border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed'
+                  }`}
+                />
+                {errors.startTime && (
+                  <p className="mt-1 text-sm text-red-600">{errors.startTime}</p>
+                )}
+              </div>
+
+              {/* End Time */}
+              <div>
+                <label htmlFor="endTime" className="block text-sm font-medium text-gray-700 mb-2">
+                  <Calendar className="w-4 h-4 inline mr-1" />
+                  End Time
+                </label>
+                <input
+                  type="time"
+                  id="endTime"
+                  name="endTime"
+                  value={checkInWindowData.endTime}
+                  onChange={handleCheckInWindowChange}
+                  disabled={!isEditingCheckInWindow}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                    isEditingCheckInWindow 
+                      ? (errors.endTime ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 bg-white')
+                      : 'border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed'
+                  }`}
+                />
+                {errors.endTime && (
+                  <p className="mt-1 text-sm text-red-600">{errors.endTime}</p>
+                )}
+              </div>
+
+              {/* Timezone */}
+              <div>
+                <label htmlFor="timezone" className="block text-sm font-medium text-gray-700 mb-2">
+                  <Globe className="w-4 h-4 inline mr-1" />
+                  Timezone
+                </label>
+                <select
+                  id="timezone"
+                  name="timezone"
+                  value={checkInWindowData.timezone}
+                  onChange={handleCheckInWindowChange}
+                  disabled={!isEditingCheckInWindow}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                    isEditingCheckInWindow 
+                      ? (errors.timezone ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 bg-white')
+                      : 'border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed'
+                  }`}
+                >
+                  <option value="UTC-12">UTC-12 (Baker Island)</option>
+                  <option value="UTC-11">UTC-11 (American Samoa)</option>
+                  <option value="UTC-10">UTC-10 (Hawaii)</option>
+                  <option value="UTC-9">UTC-9 (Alaska)</option>
+                  <option value="UTC-8">UTC-8 (Pacific Time)</option>
+                  <option value="UTC-7">UTC-7 (Mountain Time)</option>
+                  <option value="UTC-6">UTC-6 (Central Time)</option>
+                  <option value="UTC-5">UTC-5 (Eastern Time)</option>
+                  <option value="UTC-4">UTC-4 (Atlantic Time)</option>
+                  <option value="UTC-3">UTC-3 (Brazil)</option>
+                  <option value="UTC-2">UTC-2 (Mid-Atlantic)</option>
+                  <option value="UTC-1">UTC-1 (Azores)</option>
+                  <option value="UTC+0">UTC+0 (Greenwich)</option>
+                  <option value="UTC+1">UTC+1 (Central European)</option>
+                  <option value="UTC+2">UTC+2 (Eastern European)</option>
+                  <option value="UTC+3">UTC+3 (Moscow)</option>
+                  <option value="UTC+4">UTC+4 (Gulf Standard)</option>
+                  <option value="UTC+5">UTC+5 (Pakistan)</option>
+                  <option value="UTC+6">UTC+6 (Bangladesh)</option>
+                  <option value="UTC+7">UTC+7 (Indochina)</option>
+                  <option value="UTC+8">UTC+8 (China)</option>
+                  <option value="UTC+9">UTC+9 (Japan)</option>
+                  <option value="UTC+10">UTC+10 (Eastern Australia)</option>
+                  <option value="UTC+11">UTC+11 (Solomon Islands)</option>
+                  <option value="UTC+12">UTC+12 (New Zealand)</option>
+                </select>
+                {errors.timezone && (
+                  <p className="mt-1 text-sm text-red-600">{errors.timezone}</p>
+                )}
+              </div>
+
+              {/* Description */}
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Note:</strong> This window determines when developers can check in as &quot;on-time&quot;. 
+                  Check-ins before the start time are marked as &quot;early&quot;, and after the end time as &quot;late&quot;.
+                </p>
+              </div>
+
+              {/* Check-in Window Error */}
+              {errors.checkInWindow && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center">
+                  <AlertCircle className="w-5 h-5 text-red-500 mr-2" />
+                  <p className="text-sm text-red-600">{errors.checkInWindow}</p>
+                </div>
+              )}
+
+              {/* Check-in Window Success */}
+              {checkInWindowSuccess && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center">
+                  <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                  <p className="text-sm text-green-600">Check-in window updated successfully!</p>
+                </div>
+              )}
+
+              {/* Edit Mode Buttons */}
+              {isEditingCheckInWindow && (
+                <div className="flex space-x-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleUpdateCheckInWindow}
+                    disabled={isLoading}
+                    className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-2 px-4 rounded-lg font-medium hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Updating...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Update Window
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelCheckInWindowEdit}
                     disabled={isLoading}
                     className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                   >

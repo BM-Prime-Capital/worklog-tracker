@@ -1,69 +1,25 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calendar, Clock, CheckCircle, XCircle, TrendingUp, Award, Target, Users } from 'lucide-react'
+import React from 'react'
+import { Calendar, CheckCircle, TrendingUp, Award, Target, Plus, Smile, Frown, Meh, Heart, Zap, Coffee } from 'lucide-react'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import DashboardLayout from '@/components/layout/DashboardLayout'
-import { useAuth } from '@/contexts/AuthContextNew'
+import { formatDateLocal } from '@/lib/dateUtils'
+// import { useAuth } from '@/contexts/AuthContextNew'
 
-// Mock data for online status
-const mockOnlineStatusData = {
-  currentStreak: 12,
-  longestStreak: 28,
-  totalDaysPresent: 156,
-  totalDaysTracked: 180,
-  currentStatus: 'online', // 'online', 'away', 'busy', 'offline'
-  lastUpdated: '2 hours ago',
-  todayStatus: 'present', // 'present', 'absent', 'not-set'
-  weeklyStats: {
-    thisWeek: 5,
-    lastWeek: 7,
-    change: '+2'
-  },
-  monthlyStats: {
-    thisMonth: 18,
-    lastMonth: 22,
-    change: '-4'
-  },
-  // Calendar data for the last 6 months (180 days)
-  calendarData: generateMockCalendarData(),
-  // Recent activity
-  recentActivity: [
-    { date: '2024-01-15', time: '09:15', status: 'present', note: 'Started work' },
-    { date: '2024-01-14', time: '09:30', status: 'present', note: 'Team meeting day' },
-    { date: '2024-01-13', time: '10:00', status: 'present', note: 'Weekend work' },
-    { date: '2024-01-12', time: '09:00', status: 'present', note: 'Regular start' },
-    { date: '2024-01-11', time: '09:15', status: 'present', note: 'Code review day' },
-    { date: '2024-01-10', time: '09:00', status: 'present', note: 'Sprint planning' },
-    { date: '2024-01-09', time: '09:30', status: 'absent', note: 'Sick day' },
-    { date: '2024-01-08', time: '09:00', status: 'present', note: 'Regular start' },
-  ]
-}
+// Removed mock data - now using real API data
 
-// Generate mock calendar data for the last 180 days
-function generateMockCalendarData() {
-  const data = []
-  const today = new Date()
-  
-  for (let i = 179; i >= 0; i--) {
-    const date = new Date(today)
-    date.setDate(date.getDate() - i)
-    
-    // Randomly generate presence data (70% present, 20% absent, 10% not set)
-    const random = Math.random()
-    let status = 'not-set'
-    if (random < 0.7) status = 'present'
-    else if (random < 0.9) status = 'absent'
-    
-    data.push({
-      date: date.toISOString().split('T')[0],
-      status,
-      note: status === 'present' ? 'Present' : status === 'absent' ? 'Absent' : 'Not set'
-    })
-  }
-  
-  return data
-}
+// Mood options configuration
+const moodOptions = [
+  { value: 'happy', label: 'Happy', icon: Smile, color: 'text-yellow-500', bgColor: 'bg-yellow-50' },
+  { value: 'excited', label: 'Excited', icon: Zap, color: 'text-purple-500', bgColor: 'bg-purple-50' },
+  { value: 'focused', label: 'Focused', icon: Target, color: 'text-blue-500', bgColor: 'bg-blue-50' },
+  { value: 'energetic', label: 'Energetic', icon: Coffee, color: 'text-orange-500', bgColor: 'bg-orange-50' },
+  { value: 'motivated', label: 'Motivated', icon: Heart, color: 'text-red-500', bgColor: 'bg-red-50' },
+  { value: 'sick', label: 'Sick', icon: Frown, color: 'text-gray-500', bgColor: 'bg-gray-50' },
+  { value: 'tired', label: 'Tired', icon: Meh, color: 'text-gray-400', bgColor: 'bg-gray-100' }
+]
 
 // Status configuration
 const statusConfig = {
@@ -90,26 +46,156 @@ const statusConfig = {
   }
 }
 
-export default function OnlineStatusPage() {
-  const { user } = useAuth()
-  const [isMarkingPresent, setIsMarkingPresent] = useState(false)
-  const [currentStatus, setCurrentStatus] = useState(mockOnlineStatusData.currentStatus)
-  const [todayStatus, setTodayStatus] = useState(mockOnlineStatusData.todayStatus)
-  const [showCalendar, setShowCalendar] = useState(true)
+// Check-in type configuration
+const checkInTypeConfig = {
+  early: {
+    label: 'Early',
+    color: 'text-green-600',
+    bgColor: 'bg-green-50',
+    borderColor: 'border-green-200',
+    icon: '⏰'
+  },
+  'on-time': {
+    label: 'On Time',
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-50',
+    borderColor: 'border-blue-200',
+    icon: '✅'
+  },
+  late: {
+    label: 'Late',
+    color: 'text-orange-600',
+    bgColor: 'bg-orange-50',
+    borderColor: 'border-orange-200',
+    icon: '⏰'
+  }
+}
 
-  const handleMarkPresent = async () => {
+export default function OnlineStatusPage() {
+  const [isMarkingPresent, setIsMarkingPresent] = useState(false)
+  const [showCheckInModal, setShowCheckInModal] = useState(false)
+  const [selectedMood, setSelectedMood] = useState('')
+  const [description, setDescription] = useState('')
+  const [currentStatus] = useState('online') // Default status
+  const [todayStatus, setTodayStatus] = useState('not-set')
+  const [todayMood, setTodayMood] = useState('')
+  const [todayDescription, setTodayDescription] = useState('')
+  const [todayCheckInTime, setTodayCheckInTime] = useState('')
+  const [todayCheckInType, setTodayCheckInType] = useState('on-time')
+  const [showCalendar, setShowCalendar] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
+  const [onlineStatusData, setOnlineStatusData] = useState({
+    stats: {
+      currentStreak: 0,
+      longestStreak: 0,
+      totalDaysPresent: 0,
+      totalDaysTracked: 0,
+      attendanceRate: 0
+    },
+    punctualityStats: {
+      early: 0,
+      onTime: 0,
+      late: 0,
+      total: 0
+    },
+    organizationCheckInWindow: {
+      startTime: '08:00',
+      endTime: '10:00',
+      timezone: 'UTC+3'
+    },
+    recentActivity: [] as Array<{
+      date: string
+      time: string
+      status: string
+      mood: string
+      description: string
+      checkInType: string
+      isEdited: boolean
+    }>
+  })
+
+  const fetchOnlineStatusData = async () => {
+    try {
+      setIsLoading(true)
+      const response = await fetch('/api/developer/online-status')
+      const data = await response.json()
+
+      if (response.ok) {
+        setOnlineStatusData(data.data)
+        
+        // Update today's status if available
+        if (data.data.todayStatus) {
+          setTodayStatus(data.data.todayStatus.status)
+          setTodayMood(data.data.todayStatus.mood || '')
+          setTodayDescription(data.data.todayStatus.description || '')
+          setTodayCheckInTime(data.data.todayStatus.time || '')
+          setTodayCheckInType(data.data.todayStatus.checkInType || 'on-time')
+        } else {
+          // Reset today's status if no check-in today
+          setTodayStatus('not-set')
+          setTodayMood('')
+          setTodayDescription('')
+          setTodayCheckInTime('')
+          setTodayCheckInType('on-time')
+        }
+      } else {
+        console.error('Failed to fetch online status data:', data.error)
+      }
+    } catch (error) {
+      console.error('Failed to fetch online status data:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchOnlineStatusData()
+  }, [])
+
+  const handleOpenCheckInModal = () => {
+    setShowCheckInModal(true)
+    setSelectedMood('')
+    setDescription('')
+  }
+
+  const handleCheckIn = async () => {
     setIsMarkingPresent(true)
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    setTodayStatus('present')
-    setIsMarkingPresent(false)
-    
-    // Update mock data
-    mockOnlineStatusData.todayStatus = 'present'
-    mockOnlineStatusData.currentStreak += 1
-    mockOnlineStatusData.totalDaysPresent += 1
+    try {
+      const response = await fetch('/api/developer/online-status/check-in', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mood: selectedMood,
+          description: description
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to check in')
+      }
+
+      // Update state with real data
+      setTodayStatus('present')
+      setTodayMood(data.checkIn.mood)
+      setTodayDescription(data.checkIn.description)
+      setTodayCheckInTime(data.checkIn.time)
+      setTodayCheckInType(data.checkIn.checkInType)
+      setIsMarkingPresent(false)
+      setShowCheckInModal(false)
+      
+      // Refresh the page data
+      await fetchOnlineStatusData()
+      
+    } catch (error) {
+      console.error('Check-in error:', error)
+      setIsMarkingPresent(false)
+      // You might want to show an error message to the user
+    }
   }
 
   const getStatusColor = (status: string) => {
@@ -140,6 +226,20 @@ export default function OnlineStatusPage() {
     }
   }
 
+  const getMoodIcon = (mood: string) => {
+    const moodOption = moodOptions.find(option => option.value === mood)
+    return moodOption ? moodOption.icon : Smile
+  }
+
+  const getMoodColor = (mood: string) => {
+    const moodOption = moodOptions.find(option => option.value === mood)
+    return moodOption ? moodOption.color : 'text-gray-500'
+  }
+
+  const getCheckInTypeConfig = (type: string) => {
+    return checkInTypeConfig[type as keyof typeof checkInTypeConfig] || checkInTypeConfig['on-time']
+  }
+
   return (
     <ProtectedRoute allowedRoles={['DEVELOPER']}>
       <DashboardLayout
@@ -157,7 +257,7 @@ export default function OnlineStatusPage() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-600">Current Streak</p>
-                  <p className="text-2xl font-bold text-gray-900">{mockOnlineStatusData.currentStreak}</p>
+                  <p className="text-2xl font-bold text-gray-900">{isLoading ? '...' : onlineStatusData.stats.currentStreak}</p>
                   <p className="text-xs text-gray-500">days</p>
                 </div>
               </div>
@@ -171,7 +271,7 @@ export default function OnlineStatusPage() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-600">Longest Streak</p>
-                  <p className="text-2xl font-bold text-gray-900">{mockOnlineStatusData.longestStreak}</p>
+                  <p className="text-2xl font-bold text-gray-900">{isLoading ? '...' : onlineStatusData.stats.longestStreak}</p>
                   <p className="text-xs text-gray-500">days</p>
                 </div>
               </div>
@@ -185,7 +285,7 @@ export default function OnlineStatusPage() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Present</p>
-                  <p className="text-2xl font-bold text-gray-900">{mockOnlineStatusData.totalDaysPresent}</p>
+                  <p className="text-2xl font-bold text-gray-900">{isLoading ? '...' : onlineStatusData.stats.totalDaysPresent}</p>
                   <p className="text-xs text-gray-500">days</p>
                 </div>
               </div>
@@ -200,7 +300,7 @@ export default function OnlineStatusPage() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Attendance Rate</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {Math.round((mockOnlineStatusData.totalDaysPresent / mockOnlineStatusData.totalDaysTracked) * 100)}%
+                    {isLoading ? '...' : `${onlineStatusData.stats.attendanceRate}%`}
                   </p>
                   <p className="text-xs text-gray-500">overall</p>
                 </div>
@@ -226,9 +326,42 @@ export default function OnlineStatusPage() {
                 </div>
               </div>
 
-              {/* Mark Present Button */}
+              {/* Today's Status Display */}
+              {todayStatus === 'present' && (
+                <div className="mb-8 p-6 bg-green-50 border border-green-200 rounded-xl">
+                  <div className="flex items-center justify-center space-x-4 mb-4">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                      <span className="text-lg font-semibold text-green-800">Present Today</span>
+                    </div>
+                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${getCheckInTypeConfig(todayCheckInType).bgColor} ${getCheckInTypeConfig(todayCheckInType).color} ${getCheckInTypeConfig(todayCheckInType).borderColor} border`}>
+                      {getCheckInTypeConfig(todayCheckInType).icon} {getCheckInTypeConfig(todayCheckInType).label}
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div className="text-center">
+                      <p className="text-gray-600">Check-in Time</p>
+                      <p className="font-semibold text-gray-900">{todayCheckInTime}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-gray-600">Mood</p>
+                      <div className="flex items-center justify-center space-x-1">
+                        {React.createElement(getMoodIcon(todayMood), { className: `w-4 h-4 ${getMoodColor(todayMood)}` })}
+                        <span className="font-semibold text-gray-900 capitalize">{todayMood}</span>
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-gray-600">Description</p>
+                      <p className="font-semibold text-gray-900">{todayDescription || 'No description'}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Check-in Button */}
               <button
-                onClick={handleMarkPresent}
+                onClick={handleOpenCheckInModal}
                 disabled={isMarkingPresent || todayStatus === 'present'}
                 className={`px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-200 ${
                   todayStatus === 'present'
@@ -246,23 +379,106 @@ export default function OnlineStatusPage() {
                 ) : todayStatus === 'present' ? (
                   <div className="flex items-center space-x-2">
                     <CheckCircle className="w-5 h-5" />
-                    <span>Already Marked Present</span>
+                    <span>Already Checked In</span>
                   </div>
                 ) : (
                   <div className="flex items-center space-x-2">
-                    <CheckCircle className="w-5 h-5" />
-                    <span>Mark Me Present Today</span>
+                    <Plus className="w-5 h-5" />
+                    <span>Check In Today</span>
                   </div>
                 )}
               </button>
 
-              {todayStatus === 'present' && (
-                <p className="text-green-600 text-sm mt-3">
-                  ✓ You&apos;ve marked yourself present for today!
-                </p>
-              )}
+              {/* Organization Check-in Window Info */}
+              <div className="mt-4 text-sm text-gray-500">
+                <p>Organization check-in window: {onlineStatusData.organizationCheckInWindow.startTime} - {onlineStatusData.organizationCheckInWindow.endTime} ({onlineStatusData.organizationCheckInWindow.timezone})</p>
+              </div>
             </div>
           </div>
+
+          {/* Check-in Modal */}
+          {showCheckInModal && (
+            <div className="fixed inset-0 bg-black/80 transition-opacity flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+                {/* Header */}
+                <div className="p-6 border-b border-gray-200">
+                  <h3 className="text-xl font-semibold text-gray-900">Check In Today</h3>
+                </div>
+                
+                {/* Scrollable Content */}
+                <div className="flex-1 overflow-y-auto p-6">
+                  {/* Current Time Display */}
+                  <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Current Time:</span>
+                      <span className="font-semibold text-gray-900">{new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    <div className="flex items-center justify-between mt-2">
+                    <span className="text-sm text-gray-600">Check-in Window:</span>
+                    <span className="text-sm text-gray-900">{onlineStatusData.organizationCheckInWindow.startTime} - {onlineStatusData.organizationCheckInWindow.endTime}</span>
+                    </div>
+                  </div>
+
+                  {/* Mood Selection */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-3">How are you feeling today? (Optional)</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {moodOptions.map((mood) => {
+                        const IconComponent = mood.icon
+                        return (
+                          <button
+                            key={mood.value}
+                            onClick={() => setSelectedMood(mood.value)}
+                            className={`p-2 rounded-lg border-2 transition-all ${
+                              selectedMood === mood.value
+                                ? `border-blue-500 ${mood.bgColor}`
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <div className="flex flex-col items-center space-y-1">
+                              <IconComponent className={`w-4 h-4 ${mood.color}`} />
+                              <span className="text-xs font-medium text-gray-700">{mood.label}</span>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Description Field */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Additional Notes (Optional)</label>
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Any additional information about your availability today..."
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                      rows={2}
+                    />
+                  </div>
+                </div>
+
+                {/* Fixed Footer */}
+                <div className="p-6 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={() => setShowCheckInModal(false)}
+                      className="flex-1 px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleCheckIn}
+                      disabled={isMarkingPresent}
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {isMarkingPresent ? 'Checking In...' : 'Check In'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Toggle View Buttons */}
           <div className="flex justify-center space-x-4">
@@ -286,7 +502,7 @@ export default function OnlineStatusPage() {
               }`}
             >
               <TrendingUp className="w-4 h-4 inline mr-2" />
-              Contribution Graph
+              Weekly Activity Grid
             </button>
           </div>
 
@@ -294,65 +510,86 @@ export default function OnlineStatusPage() {
           {showCalendar && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100/50 p-6">
               <h3 className="text-xl font-semibold text-gray-900 mb-6">Monthly Calendar View</h3>
-              <div className="grid grid-cols-7 gap-1">
-                {/* Day headers */}
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                  <div key={day} className="p-2 text-center text-sm font-medium text-gray-500">
-                    {day}
-                  </div>
-                ))}
-                
-                {/* Calendar days */}
-                {generateCalendarDays().map((day, index) => (
-                  <div
-                    key={index}
-                    className={`p-2 text-center text-sm border border-gray-100 ${
-                      day.isCurrentMonth ? 'bg-white' : 'bg-gray-50'
-                    }`}
-                  >
-                    {day.date && (
-                      <div className="flex flex-col items-center space-y-1">
-                        <span className={`text-xs ${day.isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}`}>
-                          {day.date}
-                        </span>
-                        <div className={`w-3 h-3 rounded-full ${getStatusColor(day.status)}`}></div>
+              {isLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="mt-2 text-gray-500">Loading calendar data...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-7 gap-1">
+                    {/* Day headers */}
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                      <div key={day} className="p-2 text-center text-sm font-medium text-gray-500">
+                        {day}
                       </div>
-                    )}
+                    ))}
+                    
+                    {/* Calendar days */}
+                    {generateCalendarDays(onlineStatusData.recentActivity.map(activity => ({
+                      date: activity.date,
+                      status: activity.status
+                    }))).map((day, index) => (
+                      <div
+                        key={index}
+                        className={`p-2 text-center text-sm border border-gray-100 ${
+                          day.isCurrentMonth ? 'bg-white' : 'bg-gray-50'
+                        }`}
+                      >
+                        {day.date && (
+                          <div className="flex flex-col items-center space-y-1">
+                            <span className={`text-xs ${day.isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}`}>
+                              {day.date}
+                            </span>
+                            <div className={`w-3 h-3 rounded-full ${getStatusColor(day.status)}`}></div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              
-              {/* Legend */}
-              <div className="flex items-center justify-center space-x-6 mt-6 pt-6 border-t border-gray-200">
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span className="text-sm text-gray-600">Present</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                  <span className="text-sm text-gray-600">Absent</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
-                  <span className="text-sm text-gray-600">Not Set</span>
-                </div>
-              </div>
+                  
+                  {/* Legend */}
+                  <div className="flex items-center justify-center space-x-6 mt-6 pt-6 border-t border-gray-200">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <span className="text-sm text-gray-600">Present</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                      <span className="text-sm text-gray-600">Absent</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
+                      <span className="text-sm text-gray-600">Not Set</span>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
-          {/* Contribution Graph View (GitHub-style) */}
+          {/* Weekly Activity Grid View */}
           {!showCalendar && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100/50 p-6">
-              <h3 className="text-xl font-semibold text-gray-900 mb-6">Contribution Graph</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-6">Weekly Activity Grid</h3>
               
-              {/* GitHub-style contribution grid */}
+              {isLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="mt-2 text-gray-500">Loading activity data...</p>
+                </div>
+              ) : (
+                <>
+              {/* Weekly Activity Grid */}
               <div className="w-full">
                 <div className="flex space-x-1">
-                  {/* Weekday labels on the left */}
-                  <div className="flex flex-col space-y-1 pr-3">
-                    {['Mon', 'Wed', 'Fri'].map(day => (
-                      <div key={day} className="h-2 text-xs text-gray-400 leading-none">
-                        {day}
+                  {/* Weekday labels on the left - properly aligned with Sunday-Saturday pattern */}
+                  <div className="flex flex-col pr-3">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                      <div key={day} className={`h-2 text-xs leading-none flex items-center justify-center ${
+                        ['Mon', 'Wed', 'Fri'].includes(day) ? 'text-gray-600 font-medium' : 'text-gray-400'
+                      }`}>
+                        {['Mon', 'Wed', 'Fri'].includes(day) ? day : ''}
                       </div>
                     ))}
                   </div>
@@ -367,15 +604,18 @@ export default function OnlineStatusPage() {
                       ))}
                     </div>
                     
-                    {/* Contribution grid */}
+                    {/* Weekly Activity Grid - properly structured with Sunday-Saturday weeks */}
                     <div className="grid grid-cols-52 gap-0.5">
-                      {generateContributionGrid().map((week, weekIndex) => (
-                        <div key={weekIndex} className="flex flex-col space-y-0.5">
+                      {generateWeeklyActivityGrid(onlineStatusData.recentActivity.map(activity => ({
+                        date: activity.date,
+                        status: activity.status
+                      }))).map((week, weekIndex) => (
+                        <div key={weekIndex} className="flex flex-col">
                           {week.map((day, dayIndex) => (
                             <div
                               key={`${weekIndex}-${dayIndex}`}
-                              className={`w-2 h-2 rounded-sm ${getContributionColor(day.level)} hover:scale-150 transition-transform cursor-pointer border border-gray-100`}
-                              title={`${day.date}: ${day.status} (${day.level} activity)`}
+                              className={`w-2 h-2 rounded-sm ${getActivityColor(day.status)} hover:scale-150 transition-transform cursor-pointer border border-gray-100`}
+                              title={`${day.date}: ${day.status}`}
                             />
                           ))}
                         </div>
@@ -384,24 +624,28 @@ export default function OnlineStatusPage() {
                   </div>
                 </div>
               </div>
-              
+                  
               {/* Legend */}
-              <div className="flex items-center justify-center space-x-4 mt-6 pt-6 border-t border-gray-200">
-                <span className="text-sm text-gray-500">Less</span>
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-gray-100 rounded-sm border border-gray-200"></div>
-                  <div className="w-2 h-2 bg-gray-200 rounded-sm border border-gray-200"></div>
-                  <div className="w-2 h-2 bg-green-200 rounded-sm border border-gray-200"></div>
-                  <div className="w-2 h-2 bg-green-400 rounded-sm border border-gray-200"></div>
-                  <div className="w-2 h-2 bg-green-600 rounded-sm border border-gray-200"></div>
-                  <div className="w-2 h-2 bg-green-800 rounded-sm border border-gray-200"></div>
+              <div className="flex items-center justify-center space-x-6 mt-6 pt-6 border-t border-gray-200">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-sm"></div>
+                  <span className="text-sm text-gray-600">Present</span>
                 </div>
-                <span className="text-sm text-gray-500">More</span>
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-red-500 rounded-sm"></div>
+                  <span className="text-sm text-gray-600">Absent</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-gray-300 rounded-sm"></div>
+                  <span className="text-sm text-gray-600">Not Set</span>
+                </div>
               </div>
               
               <p className="text-sm text-gray-500 mt-4 text-center">
-                Hover over the squares to see daily status and activity level
+                Hover over the squares to see daily status. Each column represents a week, each row represents a day of the week.
               </p>
+                </>
+              )}
             </div>
           )}
 
@@ -409,20 +653,35 @@ export default function OnlineStatusPage() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-100/50 p-6">
             <h3 className="text-xl font-semibold text-gray-900 mb-6">Recent Activity</h3>
             <div className="space-y-3">
-              {mockOnlineStatusData.recentActivity.map((activity, index) => (
-                <div key={index} className="flex items-center justify-between p-3 rounded-lg border border-gray-100">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-3 h-3 rounded-full ${getStatusColor(activity.status)}`}></div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{activity.note}</p>
-                      <p className="text-xs text-gray-500">{activity.date} at {activity.time}</p>
+              {isLoading ? (
+                <div className="text-center py-4">
+                  <div className="text-gray-500">Loading recent activity...</div>
+                </div>
+              ) : onlineStatusData.recentActivity.length > 0 ? (
+                onlineStatusData.recentActivity.map((activity, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 rounded-lg border border-gray-100">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-3 h-3 rounded-full ${getStatusColor(activity.status)}`}></div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{activity.description || 'Checked in'}</p>
+                        <p className="text-xs text-gray-500">{activity.date} at {activity.time}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusConfig[activity.status as keyof typeof statusConfig]?.bgColor} ${statusConfig[activity.status as keyof typeof statusConfig]?.textColor} ${statusConfig[activity.status as keyof typeof statusConfig]?.borderColor} border`}>
+                        {getStatusLabel(activity.status)}
+                      </span>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCheckInTypeConfig(activity.checkInType).bgColor} ${getCheckInTypeConfig(activity.checkInType).color} ${getCheckInTypeConfig(activity.checkInType).borderColor} border`}>
+                        {getCheckInTypeConfig(activity.checkInType).icon} {getCheckInTypeConfig(activity.checkInType).label}
+                      </span>
                     </div>
                   </div>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusConfig[activity.status as keyof typeof statusConfig]?.bgColor} ${statusConfig[activity.status as keyof typeof statusConfig]?.textColor} ${statusConfig[activity.status as keyof typeof statusConfig]?.borderColor} border`}>
-                    {getStatusLabel(activity.status)}
-                  </span>
+                ))
+              ) : (
+                <div className="text-center py-4">
+                  <div className="text-gray-500">No recent activity</div>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>
@@ -432,7 +691,7 @@ export default function OnlineStatusPage() {
 }
 
 // Helper function to generate calendar days for current month
-function generateCalendarDays() {
+function generateCalendarDays(activityData: Array<{date: string, status: string}>) {
   const today = new Date()
   const year = today.getFullYear()
   const month = today.getMonth()
@@ -449,9 +708,9 @@ function generateCalendarDays() {
     const isCurrentMonth = currentDate.getMonth() === month
     const date = isCurrentMonth ? currentDate.getDate() : null
     
-    // Find status for this date
-    const dateString = currentDate.toISOString().split('T')[0]
-    const statusData = mockOnlineStatusData.calendarData.find(d => d.date === dateString)
+    // Find status for this date from real activity data
+    const dateString = formatDateLocal(currentDate)
+    const statusData = activityData.find(d => d.date === dateString)
     const status = statusData ? statusData.status : 'not-set'
     
     days.push({
@@ -485,38 +744,35 @@ function generateMonthLabels() {
   return months
 }
 
-// Helper function to generate a grid of weeks for the contribution graph
-function generateContributionGrid() {
+// Helper function to generate a weekly activity grid (Sunday-Saturday weeks)
+function generateWeeklyActivityGrid(activityData: Array<{date: string, status: string}>) {
   const weeks = []
   const today = new Date()
   const year = today.getFullYear()
   
+  // Start from the first Sunday of the year
+  const firstSunday = new Date(year, 0, 1)
+  const firstSundayDay = firstSunday.getDay() // 0 = Sunday
+  const daysToFirstSunday = firstSundayDay === 0 ? 0 : 7 - firstSundayDay
+  firstSunday.setDate(firstSunday.getDate() + daysToFirstSunday)
+  
   // Generate 52 weeks of data (full year)
   for (let week = 0; week < 52; week++) {
     const weekDays = []
+    
+    // Generate 7 days for this week (Sunday to Saturday)
     for (let day = 0; day < 7; day++) {
-      const date = new Date(year, 0, 1) // Start from January 1st
-      date.setDate(date.getDate() + (week * 7) + day)
+      const date = new Date(firstSunday)
+      date.setDate(firstSunday.getDate() + (week * 7) + day)
       
-      // Find status for this date from mock data
-      const dateString = date.toISOString().split('T')[0]
-      const statusData = mockOnlineStatusData.calendarData.find(d => d.date === dateString)
+      // Find status for this date from real activity data
+      const dateString = formatDateLocal(date)
+      const statusData = activityData.find(d => d.date === dateString)
       const status = statusData ? statusData.status : 'not-set'
-      
-      // Generate activity level based on status
-      let level = 0
-      if (status === 'present') {
-        level = Math.floor(Math.random() * 4) + 2 // 2-5 for present days
-      } else if (status === 'absent') {
-        level = 1 // Low activity for absent days
-      } else {
-        level = 0 // No activity for not-set days
-      }
       
       weekDays.push({
         date: dateString,
-        status,
-        level
+        status
       })
     }
     weeks.push(weekDays)
@@ -525,15 +781,12 @@ function generateContributionGrid() {
   return weeks
 }
 
-// Helper function to get color based on activity level
-function getContributionColor(level: number) {
-  switch (level) {
-    case 0: return 'bg-gray-100'
-    case 1: return 'bg-gray-200'
-    case 2: return 'bg-green-200'
-    case 3: return 'bg-green-400'
-    case 4: return 'bg-green-600'
-    case 5: return 'bg-green-800'
-    default: return 'bg-gray-100'
+// Helper function to get color based on status
+function getActivityColor(status: string) {
+  switch (status) {
+    case 'present': return 'bg-green-500'
+    case 'absent': return 'bg-red-500'
+    case 'not-set': 
+    default: return 'bg-gray-300'
   }
 }

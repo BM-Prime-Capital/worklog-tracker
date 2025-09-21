@@ -21,6 +21,11 @@ export interface IOrganization extends Document {
     allowSelfRegistration: boolean
     requireEmailVerification: boolean
   }
+  checkInWindow?: {
+    startTime: string // '08:00'
+    endTime: string // '10:00'
+    timezone: string // 'UTC+3'
+  }
   subscription: {
     plan: 'free' | 'pro' | 'enterprise'
     status: 'active' | 'inactive' | 'cancelled' | 'trial'
@@ -95,6 +100,20 @@ const organizationSchema = new Schema<IOrganization>({
     requireEmailVerification: {
       type: Boolean,
       default: true
+    }
+  },
+  checkInWindow: {
+    startTime: {
+      type: String,
+      default: '08:00'
+    },
+    endTime: {
+      type: String,
+      default: '10:00'
+    },
+    timezone: {
+      type: String,
+      default: 'UTC+3'
     }
   },
   subscription: {

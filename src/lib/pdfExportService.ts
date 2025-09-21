@@ -1,7 +1,8 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, parseISO } from 'date-fns'
+import { format } from 'date-fns'
 import { JiraWorklog } from './jiraApiEnhanced'
+import { formatHours } from './timeUtils'
 
 // Extend jsPDF with autoTable plugin
 declare module 'jspdf' {
@@ -14,7 +15,7 @@ declare module 'jspdf' {
 }
 
 // Apply the autotable plugin to jsPDF
-(jsPDF.prototype as any).autoTable = autoTable
+(jsPDF.prototype as unknown as { autoTable: typeof autoTable }).autoTable = autoTable
 
 interface ExportOptions {
   startDate: Date
@@ -111,14 +112,14 @@ export class PDFExportService {
         this.addPageBreak()
       }
       
-      this.generateDeveloperReport(developer, options.startDate, options.endDate)
+      this.generateDeveloperReport(developer)
     })
   }
 
   /**
    * Generate individual developer report
    */
-  private generateDeveloperReport(developer: DeveloperSummary, startDate: Date, endDate: Date): void {
+  private generateDeveloperReport(developer: DeveloperSummary): void {
     // Developer header
     this.addDeveloperHeader(developer.displayName)
     
@@ -126,7 +127,7 @@ export class PDFExportService {
     this.addDeveloperSummary(developer.totalHours, developer.worklogs.length)
     
     // Worklog table
-    this.addWorklogTable(developer.worklogs, startDate, endDate)
+    this.addWorklogTable(developer.worklogs)
   }
 
   /**
@@ -146,7 +147,7 @@ export class PDFExportService {
       
       // Move currentY below the logo
       this.currentY += logoHeight + 10
-    } catch (error) {
+    } catch {
       console.warn('Could not load company logo, continuing without it')
       this.currentY += 5 // Small spacing if logo fails to load
     }
@@ -218,7 +219,7 @@ export class PDFExportService {
     
     // Create summary table
     const summaryData = [
-      ['Total Hours', `${totalHours.toFixed(2)}h`],
+      ['Total Hours', formatHours(totalHours)],
       ['Total Developers', uniqueDevelopers.toString()],
       ['Total Issues', uniqueIssues.toString()],
       ['Total Worklog Entries', worklogs.length.toString()]
@@ -264,7 +265,7 @@ export class PDFExportService {
     const developerData = developers.map(dev => [
       dev.displayName,
       'Software Engineer', // Position instead of email
-      `${dev.totalHours.toFixed(2)}h`,
+      formatHours(dev.totalHours),
       dev.worklogs.length.toString()
     ])
     
@@ -306,7 +307,7 @@ export class PDFExportService {
       
       // Move currentY below the logo
       this.currentY += logoHeight + 5
-    } catch (error) {
+    } catch {
       console.warn('Could not load company logo, continuing without it')
       this.currentY += 3 // Small spacing if logo fails to load
     }
@@ -349,7 +350,7 @@ export class PDFExportService {
     this.doc.setFont('helvetica', 'normal')
     this.doc.setTextColor(44, 62, 80)
     
-    this.doc.text(`• Total Hours: ${totalHours.toFixed(2)}h`, this.margin, this.currentY)
+    this.doc.text(`• Total Hours: ${formatHours(totalHours)}`, this.margin, this.currentY)
     this.currentY += 5
     
     this.doc.text(`• Total Worklog Entries: ${worklogCount}`, this.margin, this.currentY)
@@ -359,7 +360,7 @@ export class PDFExportService {
   /**
    * Add worklog table for individual developer
    */
-  private addWorklogTable(worklogs: JiraWorklog[], startDate: Date, endDate: Date): void {
+  private addWorklogTable(worklogs: JiraWorklog[]): void {
     this.doc.setFontSize(12)
     this.doc.setFont('helvetica', 'bold')
     this.doc.setTextColor(52, 73, 94)
@@ -373,7 +374,7 @@ export class PDFExportService {
     )
     
     // Group by day of the week
-    const worklogsByDay = this.groupWorklogsByDay(sortedWorklogs, startDate, endDate)
+    const worklogsByDay = this.groupWorklogsByDay(sortedWorklogs)
     
     // Generate table for each day
     worklogsByDay.forEach(({ day, worklogs: dayWorklogs }) => {
@@ -417,7 +418,7 @@ export class PDFExportService {
       w.summary,
       'N/A',  // Status not available in JiraWorklog
       w.comment || 'No comment',
-      `${(w.timeSpentSeconds / 3600).toFixed(2)}h`
+      formatHours(w.timeSpentSeconds / 3600)
     ])
     
     autoTable(this.doc, {
@@ -523,7 +524,7 @@ export class PDFExportService {
   /**
    * Group worklogs by day of the week
    */
-  private groupWorklogsByDay(worklogs: JiraWorklog[], startDate: Date, endDate: Date): Array<{ day: string, worklogs: JiraWorklog[] }> {
+  private groupWorklogsByDay(worklogs: JiraWorklog[]): Array<{ day: string, worklogs: JiraWorklog[] }> {
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
     const worklogsByDay: Array<{ day: string, worklogs: JiraWorklog[] }> = []
     

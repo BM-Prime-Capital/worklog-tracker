@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calendar, Clock, CheckCircle, TrendingUp, Code, Users, Target, Award, AlertCircle } from 'lucide-react'
+import { Clock, CheckCircle, TrendingUp, Code, Users, Target, Award, AlertCircle } from 'lucide-react'
 import StatsCard from './StatsCard'
 import WeeklyHoursChart from './WeeklyHoursChart'
 import { formatHours } from '@/lib/timeUtils'
@@ -74,7 +74,7 @@ export default function DeveloperDashboard({ selectedDateRange = 'this-week' }: 
   useEffect(() => {
     const fetchDeveloperData = async () => {
       try {
-    setIsLoading(true)
+        setIsLoading(true)
         setError(null)
         
         const response = await fetch(`/api/developer/dashboard?dateRange=${selectedDateRange}`)
@@ -105,20 +105,6 @@ export default function DeveloperDashboard({ selectedDateRange = 'this-week' }: 
     fetchDeveloperData()
   }, [selectedDateRange])
 
-  // Show loading state
-  if (isLoading) {
-    return (
-      <div className="max-w-7xl mx-auto space-y-8">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading your dashboard...</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   // Show error state
   if (error) {
     return (
@@ -141,19 +127,6 @@ export default function DeveloperDashboard({ selectedDateRange = 'this-week' }: 
               )}
             </div>
           </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Show no data state
-  if (!developerData) {
-    return (
-      <div className="max-w-7xl mx-auto space-y-8">
-        <div className="text-center py-12">
-          <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No data available</h3>
-          <p className="text-gray-600">Start logging work in Jira to see your dashboard data.</p>
         </div>
       </div>
     )
@@ -193,25 +166,56 @@ export default function DeveloperDashboard({ selectedDateRange = 'this-week' }: 
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white">
         <div className="flex items-center space-x-4">
           <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center text-2xl font-bold">
-            {developerData.personal.avatar}
+            {isLoading ? (
+              <div className="w-8 h-8 bg-white/30 rounded-full animate-pulse"></div>
+            ) : (
+              developerData?.personal.avatar || 'U'
+            )}
           </div>
           <div className="flex-1">
-            <h1 className="text-2xl font-bold">{developerData.personal.name}</h1>
-            <p className="text-blue-100">{developerData.personal.role}</p>
-            <div className="flex items-center space-x-4 mt-2 text-sm">
-              <span className="flex items-center space-x-1">
-                <Users className="w-4 h-4" />
-                <span>{developerData.personal.team}</span>
-              </span>
-              <span className="flex items-center space-x-1">
-                <Award className="w-4 h-4" />
-                <span>{developerData.personal.totalContributions} contributions</span>
-              </span>
-              <span className="flex items-center space-x-1">
-                <Target className="w-4 h-4" />
-                <span>{developerData.personal.currentStreak} day streak</span>
-              </span>
-            </div>
+            {isLoading ? (
+              <div className="space-y-2">
+                <div className="h-8 bg-white/30 rounded w-48 animate-pulse"></div>
+                <div className="h-5 bg-white/20 rounded w-32 animate-pulse"></div>
+                <div className="flex items-center space-x-4 mt-3">
+                  <div className="flex items-center space-x-1">
+                    <Users className="w-4 h-4" />
+                    <div className="h-4 bg-white/20 rounded w-16 animate-pulse"></div>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <Award className="w-4 h-4" />
+                    <div className="h-4 bg-white/20 rounded w-24 animate-pulse"></div>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <Target className="w-4 h-4" />
+                    <div className="h-4 bg-white/20 rounded w-20 animate-pulse"></div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <h1 className="text-2xl font-bold">
+                  {developerData?.personal.name || 'Developer'}
+                </h1>
+                <p className="text-blue-100">
+                  {developerData?.personal.role || 'Developer'}
+                </p>
+                <div className="flex items-center space-x-4 mt-2 text-sm">
+                  <span className="flex items-center space-x-1">
+                    <Users className="w-4 h-4" />
+                    <span>{developerData?.personal.team || 'Team'}</span>
+                  </span>
+                  <span className="flex items-center space-x-1">
+                    <Award className="w-4 h-4" />
+                    <span>{developerData?.personal.totalContributions || 0} contributions</span>
+                  </span>
+                  <span className="flex items-center space-x-1">
+                    <Target className="w-4 h-4" />
+                    <span>{developerData?.personal.currentStreak || 0} day streak</span>
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -220,35 +224,39 @@ export default function DeveloperDashboard({ selectedDateRange = 'this-week' }: 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard
           title="Hours This Week"
-          value={formatHours(developerData.stats.totalHoursThisWeek)}
-          change={developerData.stats.hoursChange}
-          changeType={developerData.stats.hoursChange.startsWith('+') ? 'positive' : 'negative'}
+          value={isLoading ? '...' : formatHours(developerData?.stats.totalHoursThisWeek || 0)}
+          change={isLoading ? '' : (developerData?.stats.hoursChange || '')}
+          changeType={isLoading ? 'neutral' : (developerData?.stats.hoursChange?.startsWith('+') ? 'positive' : 'negative')}
           icon={Clock}
           description="vs last week"
+          isLoading={isLoading}
         />
         <StatsCard
           title="Tasks Completed"
-          value={developerData.stats.tasksCompletedThisWeek.toString()}
-          change={developerData.stats.tasksChange}
-          changeType={developerData.stats.tasksChange.startsWith('+') ? 'positive' : 'negative'}
+          value={isLoading ? '...' : (developerData?.stats.tasksCompletedThisWeek || 0).toString()}
+          change={isLoading ? '' : (developerData?.stats.tasksChange || '')}
+          changeType={isLoading ? 'neutral' : (developerData?.stats.tasksChange?.startsWith('+') ? 'positive' : 'negative')}
           icon={CheckCircle}
           description="vs last week"
+          isLoading={isLoading}
         />
         <StatsCard
           title="Code Reviews"
-          value={developerData.stats.codeReviews.toString()}
-          change={developerData.stats.reviewsChange}
-          changeType={developerData.stats.reviewsChange.startsWith('+') ? 'positive' : 'negative'}
+          value={isLoading ? '...' : (developerData?.stats.codeReviews || 0).toString()}
+          change={isLoading ? '' : (developerData?.stats.reviewsChange || '')}
+          changeType={isLoading ? 'neutral' : (developerData?.stats.reviewsChange?.startsWith('+') ? 'positive' : 'negative')}
           icon={Code}
           description="vs last week"
+          isLoading={isLoading}
         />
         <StatsCard
           title="Active Projects"
-          value={developerData.stats.projectsActive.toString()}
+          value={isLoading ? '...' : (developerData?.stats.projectsActive || 0).toString()}
           change=""
           changeType="neutral"
           icon={TrendingUp}
           description="currently working on"
+          isLoading={isLoading}
         />
       </div>
 
@@ -259,10 +267,45 @@ export default function DeveloperDashboard({ selectedDateRange = 'this-week' }: 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100/50 p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-gray-900">My Projects</h2>
-              <span className="text-sm text-gray-500">{developerData.projects.length} active</span>
+              <span className="text-sm text-gray-500">
+                {isLoading ? '...' : `${developerData?.projects.length || 0} active`}
+              </span>
             </div>
             <div className="space-y-4">
-              {developerData.projects.length > 0 ? (
+              {isLoading ? (
+                // Skeleton loader for projects
+                [...Array(3)].map((_, i) => (
+                  <div key={i} className="border border-gray-200 rounded-lg p-4 animate-pulse">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-gray-200 rounded-lg"></div>
+                        <div>
+                          <div className="h-4 bg-gray-200 rounded w-32 mb-2"></div>
+                          <div className="h-3 bg-gray-200 rounded w-20"></div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="h-6 bg-gray-200 rounded-full w-16"></div>
+                        <div className="h-6 bg-gray-200 rounded-full w-20"></div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <div className="h-3 bg-gray-200 rounded w-20 mb-2"></div>
+                        <div className="h-4 bg-gray-200 rounded w-12"></div>
+                      </div>
+                      <div>
+                        <div className="h-3 bg-gray-200 rounded w-24 mb-2"></div>
+                        <div className="h-4 bg-gray-200 rounded w-8"></div>
+                      </div>
+                      <div>
+                        <div className="h-3 bg-gray-200 rounded w-20 mb-2"></div>
+                        <div className="h-4 bg-gray-200 rounded w-16"></div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : developerData?.projects && developerData.projects.length > 0 ? (
                 developerData.projects.map((project) => (
                 <div key={project.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                   <div className="flex items-center justify-between mb-3">
@@ -315,7 +358,24 @@ export default function DeveloperDashboard({ selectedDateRange = 'this-week' }: 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100/50 p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-6">Recent Activity</h2>
             <div className="space-y-4">
-              {developerData.recentActivity.length > 0 ? (
+              {isLoading ? (
+                // Skeleton loader for recent activity
+                [...Array(4)].map((_, i) => (
+                  <div key={i} className="flex items-start space-x-3 animate-pulse">
+                    <div className="flex-shrink-0 mt-1">
+                      <div className="w-4 h-4 bg-gray-200 rounded"></div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                      <div className="flex items-center space-x-2">
+                        <div className="h-3 bg-gray-200 rounded w-16"></div>
+                        <div className="h-3 bg-gray-200 rounded w-1"></div>
+                        <div className="h-3 bg-gray-200 rounded w-12"></div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : developerData?.recentActivity && developerData.recentActivity.length > 0 ? (
                 developerData.recentActivity.map((activity) => (
                 <div key={activity.id} className="flex items-start space-x-3">
                   <div className="flex-shrink-0 mt-1">
@@ -354,7 +414,21 @@ export default function DeveloperDashboard({ selectedDateRange = 'this-week' }: 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100/50 p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">Skills & Expertise</h2>
           <div className="space-y-4">
-            {developerData.skills.length > 0 ? (
+            {isLoading ? (
+              // Skeleton loader for skills
+              [...Array(3)].map((_, i) => (
+                <div key={i} className="flex items-center justify-between animate-pulse">
+                  <div className="flex items-center space-x-3">
+                    <div className="h-4 bg-gray-200 rounded w-20"></div>
+                    <div className="h-3 bg-gray-200 rounded w-16"></div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-20 bg-gray-200 rounded-full h-2"></div>
+                    <div className="h-4 bg-gray-200 rounded w-8"></div>
+                  </div>
+                </div>
+              ))
+            ) : developerData?.skills && developerData.skills.length > 0 ? (
               developerData.skills.map((skill) => (
               <div key={skill.name} className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
@@ -385,7 +459,20 @@ export default function DeveloperDashboard({ selectedDateRange = 'this-week' }: 
         <div className="lg:col-span-1">
           <div className="bg-white rounded-xl shadow-sm border border-gray-100/50 p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-6">This Week&apos;s Hours</h2>
-            <WeeklyHoursChart data={developerData.weeklyBreakdown} />
+            {isLoading ? (
+              // Skeleton loader for weekly chart
+              <div className="space-y-4 animate-pulse">
+                {[...Array(7)].map((_, i) => (
+                  <div key={i} className="flex items-center space-x-3">
+                    <div className="h-4 bg-gray-200 rounded w-12"></div>
+                    <div className="flex-1 bg-gray-200 rounded h-4"></div>
+                    <div className="h-4 bg-gray-200 rounded w-8"></div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <WeeklyHoursChart data={developerData?.weeklyBreakdown || []} />
+            )}
           </div>
         </div>
       </div>
